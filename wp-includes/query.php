@@ -1451,7 +1451,7 @@ class WP_Query {
 		if ( $this->is_feed && ( !empty($qv['withcomments']) || ( empty($qv['withoutcomments']) && $this->is_singular ) ) )
 			$this->is_comment_feed = true;
 
-		if ( !( $this->is_singular || $this->is_archive || $this->is_search || $this->is_feed || $this->is_trackback || $this->is_404 || $this->is_admin || $this->is_comments_popup ) )
+		if ( !( $this->is_singular || $this->is_archive || $this->is_search || $this->is_feed || $this->is_trackback || $this->is_404 || $this->is_admin || $this->is_comments_popup || $this->is_robots ) )
 			$this->is_home = true;
 
 		// Correct is_* for page_on_front and page_for_posts
@@ -1790,10 +1790,6 @@ class WP_Query {
 		}
 
 		if ( !empty($q['category__in']) ) {
-			$groupby = "{$wpdb->posts}.ID";
-		}
-
-		if ( !empty($q['category__in']) ) {
 			$join = " INNER JOIN $wpdb->term_relationships ON ($wpdb->posts.ID = $wpdb->term_relationships.object_id) INNER JOIN $wpdb->term_taxonomy ON ($wpdb->term_relationships.term_taxonomy_id = $wpdb->term_taxonomy.term_taxonomy_id) ";
 			$whichcat .= " AND $wpdb->term_taxonomy.taxonomy = 'category' ";
 			$include_cats = "'" . implode("', '", $q['category__in']) . "'";
@@ -1869,7 +1865,7 @@ class WP_Query {
 			}
 		}
 
-		if ( !empty($q['tag__in']) || !empty($q['tag_slug__in']) ) {
+		if ( !empty($q['category__in']) || !empty($q['meta_key']) || !empty($q['tag__in']) || !empty($q['tag_slug__in']) ) {
 			$groupby = "{$wpdb->posts}.ID";
 		}
 
@@ -2023,7 +2019,7 @@ class WP_Query {
 			$q['orderby'] = "$wpdb->posts.post_date ".$q['order'];
 		} else {
 			// Used to filter values
-			$allowed_keys = array('author', 'date', 'category', 'title', 'modified', 'menu_order', 'parent', 'ID', 'rand');
+			$allowed_keys = array('author', 'date', 'title', 'modified', 'menu_order', 'parent', 'ID', 'rand');
 			if ( !empty($q['meta_key']) ) {
 				$allowed_keys[] = $q['meta_key'];
 				$allowed_keys[] = 'meta_value';
@@ -2213,9 +2209,6 @@ class WP_Query {
 			$orderby = apply_filters('posts_orderby', $orderby);
 			$distinct = apply_filters('posts_distinct', $distinct);
 			$limits = apply_filters( 'post_limits', $limits );
-
-			if ( ! empty($q['meta_key']) )
-				$fields = "$fields, $wpdb->postmeta.meta_value";
 
 			$fields = apply_filters('posts_fields', $fields);
 		}

@@ -1388,10 +1388,7 @@ function status_header( $header ) {
 	if ( function_exists( 'apply_filters' ) )
 		$status_header = apply_filters( 'status_header', $status_header, $header, $text, $protocol );
 
-	if ( version_compare( phpversion(), '4.3.0', '>=' ) )
-		return @header( $status_header, true, $header );
-	else
-		return @header( $status_header );
+	return @header( $status_header, true, $header );
 }
 
 /**
@@ -2621,6 +2618,7 @@ function url_is_accessable_via_ssl($url)
 		curl_setopt($ch, CURLOPT_FAILONERROR, true);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
 
 		curl_exec($ch);
 
@@ -2912,6 +2910,4 @@ function wp_clone( $object ) {
 	}
 	return $can_clone ? clone( $object ) : $object;
 }
-
-
 ?>

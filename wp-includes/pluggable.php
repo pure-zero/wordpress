@@ -306,7 +306,7 @@ function wp_mail( $to, $subject, $message, $headers = '', $attachments = array()
 						$from_email = str_replace( '>', '', $from_email );
 						$from_email = trim( $from_email );
 					} else {
-						$from_name = trim( $content );
+						$from_email = trim( $content );
 					}
 				} elseif ( 'content-type' == strtolower($name) ) {
 					if ( strpos( $content,';' ) !== false ) {
@@ -1251,7 +1251,7 @@ function wp_salt($scheme = 'auth') {
 			$secret_key = SECURE_AUTH_KEY;
 
 		if ( defined('SECURE_AUTH_SALT') ) {
-			$salt = SECRET_AUTH_SALT;
+			$salt = SECURE_AUTH_SALT;
 		} else {
 			$salt = get_option('secure_auth_salt');
 			if ( empty($salt) ) {
