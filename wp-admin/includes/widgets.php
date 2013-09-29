@@ -76,7 +76,7 @@ function wp_list_widgets( $show = 'all', $_search = false ) {
 				}
 				$add_query['add'] = $widget['id'];
 				$action = 'add';
-				$add_url = wp_nonce_url( add_query_arg( $add_query ), "add-widget_$widget[id]" );
+				$add_url = clean_url( wp_nonce_url( add_query_arg( $add_query ), "add-widget_$widget[id]" ) );
 			} else {
 				$action = 'edit';
 				$edit_url = clean_url( add_query_arg( array(
@@ -227,11 +227,12 @@ function wp_widget_control( $sidebar_args ) {
 	if ( empty($sidebar_args['_display']) || 'template' != $sidebar_args['_display'] )
 		echo $sidebar_args['before_widget'];
 ?>
+		<div class="widget-top">
 		<h4 class="widget-title"><?php echo $widget_title ?>
 
 			<?php if ( $edit ) : ?>
 
-			<a class="widget-action widget-control-edit" href="<?php echo remove_query_arg( array( 'edit', 'key' ) ); ?>"><?php _e('Cancel'); ?></a>
+			<a class="widget-action widget-control-edit" href="<?php echo clean_url( remove_query_arg( array( 'edit', 'key' ) ) ); ?>"><?php _e('Cancel'); ?></a>
 
 			<?php else : ?>
 
@@ -239,7 +240,7 @@ function wp_widget_control( $sidebar_args ) {
 
 			<?php endif; ?>
 
-		</h4>
+		</h4></div>
 
 		<div class="widget-control"<?php if ( $edit ) echo ' style="display: block;"'; ?>>
 

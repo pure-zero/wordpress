@@ -41,8 +41,8 @@ function the_media_upload_tabs() {
 			if ( $current == $callback )
 				$class = " class='current'";
 			$href = add_query_arg(array('tab'=>$callback, 's'=>false, 'paged'=>false, 'post_mime_type'=>false, 'm'=>false));
-			$link = "<a href='$href'$class>$text</a>";
-			echo "\t<li id='tab-$callback'>$link</li>\n";
+			$link = "<a href='" . clean_url($href) . "'$class>$text</a>";
+			echo "\t<li id='" . attribute_escape("tab-$callback") . "'>$link</li>\n";
 		}
 		echo "</ul>\n";
 	}
@@ -55,7 +55,7 @@ function get_image_send_to_editor($id, $alt, $title, $align, $url='', $rel = fal
 	$rel = $rel ? ' rel="attachment wp-att-'.attribute_escape($id).'"' : '';
 
 	if ( $url )
-		$html = "<a href='".attribute_escape($url)."'$rel>$html</a>";
+		$html = '<a href="' . clean_url($url) . "\"$rel>$html</a>";
 
 	$html = apply_filters( 'image_send_to_editor', $html, $id, $alt, $title, $align, $url, $size );
 
@@ -180,13 +180,16 @@ add_action( 'media_buttons', 'media_buttons' );
 function media_buttons_head() {
 $siteurl = get_option('siteurl');
 echo "<style type='text/css' media='all'>
-	@import '{$siteurl}/wp-includes/js/thickbox/thickbox.css?1';
+	@import '{$siteurl}/wp-includes/js/thickbox/thickbox.css?ver=20080430';
 	div#TB_title {
 		background-color: #222222;
 		color: #cfcfcf;
 	}
 	div#TB_title a, div#TB_title a:visited {
 		color: #cfcfcf;
+	}
+	#TB_window {
+		top: 20px;
 	}
 </style>\n";
 }
@@ -788,6 +791,7 @@ jQuery(function($){
 			post_params : {
 				"post_id" : "<?php echo $post_id; ?>",
 				"auth_cookie" : "<?php echo $_COOKIE[AUTH_COOKIE]; ?>",
+				"_wpnonce" : "<?php echo wp_create_nonce('media-form'); ?>",
 				"type" : "<?php echo $type; ?>",
 				"tab" : "<?php echo $tab; ?>",
 				"short" : "1"
@@ -952,7 +956,6 @@ function media_upload_library_form($errors) {
 	<input type="submit" value="<?php echo attribute_escape( __( 'Search Media' ) ); ?>" class="button" />
 </div>
 
-<p>
 <ul class="subsubsub">
 <?php
 $type_links = array();
@@ -968,7 +971,7 @@ if ( empty($_GET['post_mime_type']) && !empty($num_posts[$type]) ) {
 }
 if ( empty($_GET['post_mime_type']) || $_GET['post_mime_type'] == 'all' )
 	$class = ' class="current"';
-$type_links[] = "<li><a href='" . add_query_arg(array('post_mime_type'=>'all', 'paged'=>false, 'm'=>false)) . "'$class>".__('All Types')."</a>";
+$type_links[] = "<li><a href='" . clean_url(add_query_arg(array('post_mime_type'=>'all', 'paged'=>false, 'm'=>false))) . "'$class>".__('All Types')."</a>";
 foreach ( $post_mime_types as $mime_type => $label ) {
 	$class = '';
 
@@ -978,13 +981,12 @@ foreach ( $post_mime_types as $mime_type => $label ) {
 	if ( wp_match_mime_types($mime_type, $_GET['post_mime_type']) )
 		$class = ' class="current"';
 
-	$type_links[] = "<li><a href='" . add_query_arg(array('post_mime_type'=>$mime_type, 'paged'=>false)) . "'$class>" . sprintf(__ngettext($label[2][0], $label[2][1], $num_posts[$mime_type]), "<span id='$mime_type-counter'>" . number_format_i18n( $num_posts[$mime_type] ) . '</span>') . '</a>';
+	$type_links[] = "<li><a href='" . clean_url(add_query_arg(array('post_mime_type'=>$mime_type, 'paged'=>false))) . "'$class>" . sprintf(__ngettext($label[2][0], $label[2][1], $num_posts[$mime_type]), "<span id='$mime_type-counter'>" . number_format_i18n( $num_posts[$mime_type] ) . '</span>') . '</a>';
 }
 echo implode(' | </li>', $type_links) . '</li>';
 unset($type_links);
 ?>
 </ul>
-</p>
 
 <div class="tablenav">
 
@@ -1059,8 +1061,10 @@ jQuery(function($){
 <div id="media-items">
 <?php echo get_media_items(null, $errors); ?>
 </div>
+<p class="ml-submit">
 <input type="submit" class="button savebutton" name="save" value="<?php echo attribute_escape( __( 'Save all changes' ) ); ?>" />
 <input type="hidden" name="post_id" id="post_id" value="<?php echo (int) $post_id; ?>" />
+</p>
 </form>
 <?php
 }

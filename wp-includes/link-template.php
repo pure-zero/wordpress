@@ -184,7 +184,7 @@ function get_attachment_link($id = false) {
 		else
 			$name = $object->post_name;
 		if (strpos($parentlink, '?') === false)
-			$link = trailingslashit($parentlink) . $name . '/';
+			$link = user_trailingslashit( trailingslashit($parentlink) . $name );
 	}
 
 	if (! $link ) {
@@ -402,7 +402,7 @@ function get_tag_feed_link($tag_id, $feed = '') {
 			$feed_link = 'feed';
 		else
 			$feed_link = "feed/$feed";
-		$link = $link . user_trailingslashit($feed_link, 'feed');
+		$link = trailingslashit($link) . user_trailingslashit($feed_link, 'feed');
 	}
 
 	$link = apply_filters('tag_feed_link', $link, $feed);
@@ -599,7 +599,8 @@ function adjacent_post_link($format, $link, $in_same_cat = false, $excluded_cate
 
 	$format = str_replace('%link', $link, $format);
 
-	echo $format;
+	$adjacent = $previous ? 'previous' : 'next';
+	echo apply_filters( "{$adjacent}_post_link", $format, $link );
 }
 
 function get_pagenum_link($pagenum = 1) {

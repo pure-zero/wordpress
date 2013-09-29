@@ -404,7 +404,7 @@ function delete_option( $name ) {
 
 function maybe_serialize( $data ) {
 	if ( is_string( $data ) )
-		$data = trim( $data );
+		return $data;
 	elseif ( is_array( $data ) || is_object( $data ) )
 		return serialize( $data );
 	if ( is_serialized( $data ) )
@@ -1747,6 +1747,22 @@ function apache_mod_loaded($mod, $default = false) {
 				return true;
 	}
 	return $default;
+}
+
+function validate_file( $file, $allowed_files = '' ) {
+	if ( false !== strpos( $file, '..' ))
+		return 1;
+
+	if ( false !== strpos( $file, './' ))
+		return 1;
+
+	if (':' == substr( $file, 1, 1 ))
+		return 2;
+
+	if (!empty ( $allowed_files ) && (!in_array( $file, $allowed_files ) ) )
+		return 3;
+
+	return 0;
 }
 
 ?>
