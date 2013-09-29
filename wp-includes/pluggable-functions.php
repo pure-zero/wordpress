@@ -259,10 +259,12 @@ if ( !function_exists('wp_redirect') ) :
 function wp_redirect($location, $status = 302) {
 	global $is_IIS;
 
-	$location = preg_replace('|[^a-z0-9-~+_.?#=&;,/:%]|i', '', $location);
+	$location = apply_filters('wp_redirect', $location, $status);
 
-	$strip = array('%0d', '%0a');
-	$location = str_replace($strip, '', $location);
+	if ( !$location ) // allows the wp_redirect filter to cancel a redirect
+		return false;
+
+	$location = wp_sanitize_redirect($location);
 
 	if ( $is_IIS ) {
 		header("Refresh: 0;url=$location");
@@ -271,6 +273,57 @@ function wp_redirect($location, $status = 302) {
 			status_header($status); // This causes problems on IIS and some FastCGI setups
 		header("Location: $location");
 	}
+}
+endif;
+
+if ( !function_exists('wp_sanitize_redirect') ) :
+/**
+* sanitizes a URL for use in a redirect
+* @return string redirect-sanitized URL
+**/
+function wp_sanitize_redirect($location) {
+	$location = preg_replace('|[^a-z0-9-~+_.?#=&;,/:%]|i', '', $location);
+	$location = wp_kses_no_null($location);
+
+	// remove %0d and %0a from location
+	$strip = array('%0d', '%0a');
+	$found = true;
+	while($found) {
+		$found = false;
+		foreach($strip as $val) {
+			while(strpos($location, $val) !== false) {
+				$found = true;
+				$location = str_replace($val, '', $location);
+			}
+		}
+	}
+	return $location;
+}
+endif;
+
+if ( !function_exists('wp_safe_redirect') ) :
+/**
+* performs a safe (local) redirect, using wp_redirect()
+* @return void
+**/
+function wp_safe_redirect($location, $status = 302) {
+
+	// Need to look at the URL the way it will end up in wp_redirect()
+	$location = wp_sanitize_redirect($location);
+
+	// browsers will assume 'http' is your protocol, and will obey a redirect to a URL starting with '//'
+	if ( substr($location, 0, 2) == '//' )
+		$location = 'http:' . $location;
+
+	$lp  = parse_url($location);
+	$wpp = parse_url(get_option('home'));
+
+	$allowed_hosts = (array) apply_filters('allowed_redirect_hosts', array($wpp['host']));
+
+	if ( isset($lp['host']) && ( !in_array($lp['host'], $allowed_hosts) && $lp['host'] != strtolower($wpp['host'])) )
+		$location = get_option('siteurl') . '/wp-admin/';
+	
+	wp_redirect($location, $status);
 }
 endif;
 
