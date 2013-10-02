@@ -1,24 +1,34 @@
 <?php
+/**
+ * Manage link administration actions.
+ *
+ * This page is accessed by the link management pages and handles the forms and
+ * AJAX processes for link actions.
+ *
+ * @package WordPress
+ * @subpackage Administration
+ */
+
+/** Load WordPress Administration Bootstrap */
 require_once ('admin.php');
 
 wp_reset_vars(array('action', 'cat_id', 'linkurl', 'name', 'image', 'description', 'visible', 'target', 'category', 'link_id', 'submit', 'order_by', 'links_show_cat_id', 'rating', 'rel', 'notes', 'linkcheck[]'));
 
-if ('' != $_POST['deletebookmarks'])
-	$action = 'deletebookmarks';
-if ('' != $_POST['move'])
-	$action = 'move';
-if ('' != $_POST['linkcheck'])
-	$linkcheck = $_POST[linkcheck];
+if ( ! current_user_can('manage_links') )
+	wp_die( __('You do not have sufficient permissions to edit the links for this site.') );
 
-$this_file = 'link-manager.php';
+if ( !empty($_POST['deletebookmarks']) )
+	$action = 'deletebookmarks';
+if ( !empty($_POST['move']) )
+	$action = 'move';
+if ( !empty($_POST['linkcheck']) )
+	$linkcheck = $_POST['linkcheck'];
+
+$this_file = admin_url('link-manager.php');
 
 switch ($action) {
-		case 'deletebookmarks' :
+	case 'deletebookmarks' :
 		check_admin_referer('bulk-bookmarks');
-
-		// check the current user's level first.
-		if (!current_user_can('manage_links'))
-			wp_die(__('Cheatin&#8217; uh?'));
 
 		//for each link id (in $linkcheck[]) change category to selected value
 		if (count($linkcheck) == 0) {
@@ -41,10 +51,6 @@ switch ($action) {
 	case 'move' :
 		check_admin_referer('bulk-bookmarks');
 
-		// check the current user's level first.
-		if (!current_user_can('manage_links'))
-			wp_die(__('Cheatin&#8217; uh?'));
-
 		//for each link id (in $linkcheck[]) change category to selected value
 		if (count($linkcheck) == 0) {
 			wp_redirect($this_file);
@@ -61,9 +67,11 @@ switch ($action) {
 	case 'add' :
 		check_admin_referer('add-bookmark');
 
-		add_link();
+		$redir = wp_get_referer();
+		if ( add_link() )
+			$redir = add_query_arg( 'added', 'true', $redir );
 
-		wp_redirect(wp_get_referer().'?added=true');
+		wp_redirect( $redir );
 		exit;
 		break;
 
@@ -81,9 +89,6 @@ switch ($action) {
 		$link_id = (int) $_GET['link_id'];
 		check_admin_referer('delete-bookmark_' . $link_id);
 
-		if (!current_user_can('manage_links'))
-			wp_die(__('Cheatin&#8217; uh?'));
-
 		wp_delete_link($link_id);
 
 		wp_redirect($this_file);
@@ -91,15 +96,15 @@ switch ($action) {
 		break;
 
 	case 'edit' :
-		wp_enqueue_script( array('xfn', 'dbx-admin-key?pagenow=link.php') );
-		if ( current_user_can( 'manage_categories' ) )
-			wp_enqueue_script( 'ajaxcat' );
+		wp_enqueue_script('link');
+		wp_enqueue_script('xfn');
+
+		if ( wp_is_mobile() )
+			wp_enqueue_script( 'jquery-touch-punch' );
+
 		$parent_file = 'link-manager.php';
 		$submenu_file = 'link-manager.php';
 		$title = __('Edit Link');
-		include_once ('admin-header.php');
-		if (!current_user_can('manage_links'))
-			wp_die(__('You do not have sufficient permissions to edit the links for this blog.'));
 
 		$link_id = (int) $_GET['link_id'];
 
@@ -107,11 +112,9 @@ switch ($action) {
 			wp_die(__('Link not found.'));
 
 		include ('edit-link-form.php');
+		include ('admin-footer.php');
 		break;
 
 	default :
 		break;
 }
-
-include ('admin-footer.php');
-?>

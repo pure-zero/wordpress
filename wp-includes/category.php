@@ -1,331 +1,336 @@
 <?php
+/**
+ * WordPress Category API
+ *
+ * @package WordPress
+ */
 
+/**
+ * Retrieves all category IDs.
+ *
+ * @since 2.0.0
+ * @link http://codex.wordpress.org/Function_Reference/get_all_category_ids
+ *
+ * @return object List of all of the category IDs.
+ */
 function get_all_category_ids() {
-	global $wpdb;
-
-	if ( ! $cat_ids = wp_cache_get('all_category_ids', 'category') ) {
-		$cat_ids = $wpdb->get_col("SELECT cat_ID FROM $wpdb->categories");
-		wp_cache_add('all_category_ids', $cat_ids, 'category');
+	if ( ! $cat_ids = wp_cache_get( 'all_category_ids', 'category' ) ) {
+		$cat_ids = get_terms( 'category', array('fields' => 'ids', 'get' => 'all') );
+		wp_cache_add( 'all_category_ids', $cat_ids, 'category' );
 	}
 
 	return $cat_ids;
 }
 
-function &get_categories($args = '') {
-	global $wpdb, $category_links;
+/**
+ * Retrieve list of category objects.
+ *
+ * If you change the type to 'link' in the arguments, then the link categories
+ * will be returned instead. Also all categories will be updated to be backwards
+ * compatible with pre-2.3 plugins and themes.
+ *
+ * @since 2.1.0
+ * @see get_terms() Type of arguments that can be changed.
+ * @link http://codex.wordpress.org/Function_Reference/get_categories
+ *
+ * @param string|array $args Optional. Change the defaults retrieving categories.
+ * @return array List of categories.
+ */
+function &get_categories( $args = '' ) {
+	$defaults = array( 'taxonomy' => 'category' );
+	$args = wp_parse_args( $args, $defaults );
 
-	if ( is_array($args) )
-		$r = &$args;
-	else
-		parse_str($args, $r);
+	$taxonomy = apply_filters( 'get_categories_taxonomy', $args['taxonomy'], $args );
 
-	$defaults = array('type' => 'post', 'child_of' => 0, 'orderby' => 'name', 'order' => 'ASC',
-		'hide_empty' => true, 'include_last_update_time' => false, 'hierarchical' => 1, 'exclude' => '', 'include' => '',
-		'number' => '', 'pad_counts' => false);
-	$r = array_merge($defaults, $r);
-	if ( 'count' == $r['orderby'] )
-		$r['orderby'] = 'category_count';
-	else
-		$r['orderby'] = "cat_" . $r['orderby'];  // restricts order by to cat_ID and cat_name fields
-	$r['number'] = (int) $r['number'];
-	extract($r, EXTR_SKIP);
-
-	$key = md5( serialize( $r ) );
-	if ( $cache = wp_cache_get( 'get_categories', 'category' ) )
-		if ( isset( $cache[ $key ] ) )
-			return apply_filters('get_categories', $cache[$key], $r);
-
-	$where = 'cat_ID > 0';
-	$inclusions = '';
-	if ( !empty($include) ) {
-		$child_of = 0; //ignore child_of and exclude params if using include
-		$exclude = '';
-		$incategories = preg_split('/[\s,]+/',$include);
-		if ( count($incategories) ) {
-			foreach ( $incategories as $incat ) {
-				if (empty($inclusions))
-					$inclusions = ' AND ( cat_ID = ' . intval($incat) . ' ';
-				else
-					$inclusions .= ' OR cat_ID = ' . intval($incat) . ' ';
-			}
-		}
-	}
-	if (!empty($inclusions))
-		$inclusions .= ')';
-	$where .= $inclusions;
-
-	$exclusions = '';
-	if ( !empty($exclude) ) {
-		$excategories = preg_split('/[\s,]+/',$exclude);
-		if ( count($excategories) ) {
-			foreach ( $excategories as $excat ) {
-				if (empty($exclusions))
-					$exclusions = ' AND ( cat_ID <> ' . intval($excat) . ' ';
-				else
-					$exclusions .= ' AND cat_ID <> ' . intval($excat) . ' ';
-				// TODO: Exclude children of excluded cats?   Note: children are getting excluded
-			}
-		}
-	}
-	if (!empty($exclusions))
-		$exclusions .= ')';
-	$exclusions = apply_filters('list_cats_exclusions', $exclusions, $r );
-	$where .= $exclusions;
-
-	if ( $hide_empty && !$hierarchical ) {
-		if ( 'link' == $type )
-			$where .= ' AND link_count > 0';
-		else
-			$where .= ' AND category_count > 0';
+	// Back compat
+	if ( isset($args['type']) && 'link' == $args['type'] ) {
+		_deprecated_argument( __FUNCTION__, '3.0', '' );
+		$taxonomy = $args['taxonomy'] = 'link_category';
 	}
 
-	if ( !empty($number) )
-		$number = 'LIMIT ' . $number;
-	else
-		$number = '';
+	$categories = (array) get_terms( $taxonomy, $args );
 
-	$categories = $wpdb->get_results("SELECT * FROM $wpdb->categories WHERE $where ORDER BY $orderby $order $number");
+	foreach ( array_keys( $categories ) as $k )
+		_make_cat_compat( $categories[$k] );
 
-	if ( empty($categories) )
-		return array();
-
-	// TODO: Integrate this into the main query.
-	if ( $include_last_update_time ) {
-		$stamps = $wpdb->get_results("SELECT category_id, UNIX_TIMESTAMP( MAX(post_date) ) AS ts FROM $wpdb->posts, $wpdb->post2cat, $wpdb->categories
-							WHERE post_status = 'publish' AND post_id = ID AND $where GROUP BY category_id");
-		global $cat_stamps;
-		foreach ($stamps as $stamp)
-			$cat_stamps[$stamp->category_id] = $stamp->ts;
-		function stamp_cat($cat) {
-			global $cat_stamps;
-			$cat->last_update_timestamp = $cat_stamps[$cat->cat_ID];
-			return $cat;
-		}
-		$categories = array_map('stamp_cat', $categories);
-		unset($cat_stamps);
-	}
-
-	if ( $child_of || $hierarchical ) {
-		$children = _get_category_hierarchy();
-		if ( ! empty($children) )
-			$categories = & _get_cat_children($child_of, $categories);
-	}
-
-	// Update category counts to include children.
-	if ( $pad_counts )
-		_pad_category_counts($type, $categories);
-
-	// Make sure we show empty categories that have children.
-	if ( $hierarchical && $hide_empty ) {
-		foreach ( $categories as $k => $category ) {
-			if ( ! $category->{'link' == $type ? 'link_count' : 'category_count'} ) {
-				$children = _get_cat_children($category->cat_ID, $categories);
-				foreach ( $children as $child )
-					if ( $child->{'link' == $type ? 'link_count' : 'category_count'} )
-						continue 2;
-
-				// It really is empty
-				unset($categories[$k]);
-			}
-		}
-	}
-	reset ( $categories );
-
-	$cache[ $key ] = $categories;
-	wp_cache_add( 'get_categories', $cache, 'category' );
-
-	$categories = apply_filters('get_categories', $categories, $r);
 	return $categories;
 }
 
-// Retrieves category data given a category ID or category object.
-// Handles category caching.
-function &get_category(&$category, $output = OBJECT) {
-	global $wpdb;
+/**
+ * Retrieves category data given a category ID or category object.
+ *
+ * If you pass the $category parameter an object, which is assumed to be the
+ * category row object retrieved the database. It will cache the category data.
+ *
+ * If you pass $category an integer of the category ID, then that category will
+ * be retrieved from the database, if it isn't already cached, and pass it back.
+ *
+ * If you look at get_term(), then both types will be passed through several
+ * filters and finally sanitized based on the $filter parameter value.
+ *
+ * The category will converted to maintain backwards compatibility.
+ *
+ * @since 1.5.1
+ * @uses get_term() Used to get the category data from the taxonomy.
+ *
+ * @param int|object $category Category ID or Category row object
+ * @param string $output Optional. Constant OBJECT, ARRAY_A, or ARRAY_N
+ * @param string $filter Optional. Default is raw or no WordPress defined filter will applied.
+ * @return mixed Category data in type defined by $output parameter.
+ */
+function &get_category( $category, $output = OBJECT, $filter = 'raw' ) {
+	$category = get_term( $category, 'category', $output, $filter );
+	if ( is_wp_error( $category ) )
+		return $category;
 
-	if ( empty($category) )
-		return null;
+	_make_cat_compat( $category );
 
-	if ( is_object($category) ) {
-		wp_cache_add($category->cat_ID, $category, 'category');
-		$_category = $category;
-	} else {
-		$category = (int) $category;
-		if ( ! $_category = wp_cache_get($category, 'category') ) {
-			$_category = $wpdb->get_row("SELECT * FROM $wpdb->categories WHERE cat_ID = '$category' LIMIT 1");
-			wp_cache_add($category, $_category, 'category');
-		}
-	}
-
-	$_category = apply_filters('get_category', $_category);
-
-	if ( $output == OBJECT ) {
-		return $_category;
-	} elseif ( $output == ARRAY_A ) {
-		return get_object_vars($_category);
-	} elseif ( $output == ARRAY_N ) {
-		return array_values(get_object_vars($_category));
-	} else {
-		return $_category;
-	}
+	return $category;
 }
 
-function get_category_by_path($category_path, $full_match = true, $output = OBJECT) {
-	global $wpdb;
-	$category_path = rawurlencode(urldecode($category_path));
-	$category_path = str_replace('%2F', '/', $category_path);
-	$category_path = str_replace('%20', ' ', $category_path);
-	$category_paths = '/' . trim($category_path, '/');
-	$leaf_path  = sanitize_title(basename($category_paths));
-	$category_paths = explode('/', $category_paths);
+/**
+ * Retrieve category based on URL containing the category slug.
+ *
+ * Breaks the $category_path parameter up to get the category slug.
+ *
+ * Tries to find the child path and will return it. If it doesn't find a
+ * match, then it will return the first category matching slug, if $full_match,
+ * is set to false. If it does not, then it will return null.
+ *
+ * It is also possible that it will return a WP_Error object on failure. Check
+ * for it when using this function.
+ *
+ * @since 2.1.0
+ *
+ * @param string $category_path URL containing category slugs.
+ * @param bool $full_match Optional. Whether full path should be matched.
+ * @param string $output Optional. Constant OBJECT, ARRAY_A, or ARRAY_N
+ * @return null|object|array Null on failure. Type is based on $output value.
+ */
+function get_category_by_path( $category_path, $full_match = true, $output = OBJECT ) {
+	$category_path = rawurlencode( urldecode( $category_path ) );
+	$category_path = str_replace( '%2F', '/', $category_path );
+	$category_path = str_replace( '%20', ' ', $category_path );
+	$category_paths = '/' . trim( $category_path, '/' );
+	$leaf_path  = sanitize_title( basename( $category_paths ) );
+	$category_paths = explode( '/', $category_paths );
 	$full_path = '';
 	foreach ( (array) $category_paths as $pathdir )
-		$full_path .= ( $pathdir != '' ? '/' : '' ) . sanitize_title($pathdir);
+		$full_path .= ( $pathdir != '' ? '/' : '' ) . sanitize_title( $pathdir );
 
-	$categories = $wpdb->get_results("SELECT cat_ID, category_nicename, category_parent FROM $wpdb->categories WHERE category_nicename = '$leaf_path'");
+	$categories = get_terms( 'category', array('get' => 'all', 'slug' => $leaf_path) );
 
-	if ( empty($categories) )
-		return NULL;
+	if ( empty( $categories ) )
+		return null;
 
-	foreach ($categories as $category) {
+	foreach ( $categories as $category ) {
 		$path = '/' . $leaf_path;
 		$curcategory = $category;
-		while ( ($curcategory->category_parent != 0) && ($curcategory->category_parent != $curcategory->cat_ID) ) {
-			$curcategory = $wpdb->get_row("SELECT cat_ID, category_nicename, category_parent FROM $wpdb->categories WHERE cat_ID = '$curcategory->category_parent'");
-			$path = '/' . $curcategory->category_nicename . $path;
+		while ( ( $curcategory->parent != 0 ) && ( $curcategory->parent != $curcategory->term_id ) ) {
+			$curcategory = get_term( $curcategory->parent, 'category' );
+			if ( is_wp_error( $curcategory ) )
+				return $curcategory;
+			$path = '/' . $curcategory->slug . $path;
 		}
 
 		if ( $path == $full_path )
-			return get_category($category->cat_ID, $output);
+			return get_category( $category->term_id, $output );
 	}
 
 	// If full matching is not required, return the first cat that matches the leaf.
 	if ( ! $full_match )
-		return get_category($categories[0]->cat_ID, $output);
+		return get_category( $categories[0]->term_id, $output );
 
-	return NULL;
+	return null;
 }
 
-// Get the ID of a category from its name
-function get_cat_ID($cat_name='General') {
-	global $wpdb;
+/**
+ * Retrieve category object by category slug.
+ *
+ * @since 2.3.0
+ *
+ * @param string $slug The category slug.
+ * @return object Category data object
+ */
+function get_category_by_slug( $slug  ) {
+	$category = get_term_by( 'slug', $slug, 'category' );
+	if ( $category )
+		_make_cat_compat( $category );
 
-	$cid = $wpdb->get_var("SELECT cat_ID FROM $wpdb->categories WHERE cat_name='$cat_name'");
-
-	return $cid?$cid:1;	// default to cat 1
+	return $category;
 }
 
-// Deprecate
-function get_catname($cat_ID) {
-	return get_cat_name($cat_ID);
+/**
+ * Retrieve the ID of a category from its name.
+ *
+ * @since 1.0.0
+ *
+ * @param string $cat_name Optional. Default is 'General' and can be any category name.
+ * @return int 0, if failure and ID of category on success.
+ */
+function get_cat_ID( $cat_name='General' ) {
+	$cat = get_term_by( 'name', $cat_name, 'category' );
+	if ( $cat )
+		return $cat->term_id;
+	return 0;
 }
 
-// Get the name of a category from its ID
-function get_cat_name($cat_id) {
+/**
+ * Retrieve the name of a category from its ID.
+ *
+ * @since 1.0.0
+ *
+ * @param int $cat_id Category ID
+ * @return string Category name, or an empty string if category doesn't exist.
+ */
+function get_cat_name( $cat_id ) {
 	$cat_id = (int) $cat_id;
-	$category = &get_category($cat_id);
-	return $category->cat_name;
+	$category = &get_category( $cat_id );
+	if ( ! $category || is_wp_error( $category ) )
+		return '';
+	return $category->name;
 }
 
-function cat_is_ancestor_of($cat1, $cat2) { 
-	if ( is_int($cat1) ) 
-		$cat1 = & get_category($cat1); 
-	if ( is_int($cat2) ) 
-		$cat2 = & get_category($cat2); 
-
-	if ( !$cat1->cat_ID || !$cat2->category_parent ) 
-		return false; 
-
-	if ( $cat2->category_parent == $cat1->cat_ID ) 
-		return true; 
-
-	return cat_is_ancestor_of($cat1, get_category($cat2->parent_category)); 
-} 
-
-//
-// Private
-//
-
-function &_get_cat_children($category_id, $categories) {
-	if ( empty($categories) )
-		return array();
-
-	$category_list = array();
-	$has_children = _get_category_hierarchy();
-
-	if  ( ( 0 != $category_id ) && ! isset($has_children[$category_id]) )
-		return array();
-
-	foreach ( $categories as $category ) {
-		if ( $category->cat_ID == $category_id )
-			continue;
-
-		if ( $category->category_parent == $category_id ) {
-			$category_list[] = $category;
-
-			if ( !isset($has_children[$category->cat_ID]) )
-				continue;
-
-			if ( $children = _get_cat_children($category->cat_ID, $categories) )
-				$category_list = array_merge($category_list, $children);
-		}
-	}
-
-	return $category_list;
+/**
+ * Check if a category is an ancestor of another category.
+ *
+ * You can use either an id or the category object for both parameters. If you
+ * use an integer the category will be retrieved.
+ *
+ * @since 2.1.0
+ *
+ * @param int|object $cat1 ID or object to check if this is the parent category.
+ * @param int|object $cat2 The child category.
+ * @return bool Whether $cat2 is child of $cat1
+ */
+function cat_is_ancestor_of( $cat1, $cat2 ) {
+	return term_is_ancestor_of( $cat1, $cat2, 'category' );
 }
 
-// Recalculates link or post counts by including items from child categories
-// Assumes all relevant children are already in the $categories argument
-function _pad_category_counts($type, &$categories) {
-	global $wpdb;
-
-	// Set up some useful arrays
-	foreach ( $categories as $key => $cat ) {
-		$cats[$cat->cat_ID] = & $categories[$key];
-		$cat_IDs[] = $cat->cat_ID;
-	}
-
-	// Get the relevant post2cat or link2cat records and stick them in a lookup table
-	if ( $type == 'post' ) {
-		$results = $wpdb->get_results("SELECT post_id, category_id FROM $wpdb->post2cat LEFT JOIN $wpdb->posts ON post_id = ID WHERE category_id IN (".join(',', $cat_IDs).") AND post_type = 'post' AND post_status = 'publish'");
-		foreach ( $results as $row )
-			++$cat_items[$row->category_id][$row->post_id];
-	} else {
-		$results = $wpdb->get_results("SELECT $wpdb->link2cat.link_id, category_id FROM $wpdb->link2cat LEFT JOIN $wpdb->links USING (link_id) WHERE category_id IN (".join(',', $cat_IDs).") AND link_visible = 'Y'");
-		foreach ( $results as $row )
-			++$cat_items[$row->category_id][$row->link_id];
-	}
-
-	// Touch every ancestor's lookup row for each post in each category
-	foreach ( $cat_IDs as $cat_ID ) {
-		$child = $cat_ID;
-		while ( $parent = $cats[$child]->category_parent ) {
-			if ( !empty($cat_items[$cat_ID]) )
-				foreach ( $cat_items[$cat_ID] as $item_id => $touches )
-					++$cat_items[$parent][$item_id];
-			$child = $parent;
-		}
-	}
-
-	// Transfer the touched cells 
-	foreach ( (array) $cat_items as $id => $items )
-		if ( isset($cats[$id]) )
-			$cats[$id]->{'link' == $type ? 'link_count' : 'category_count'} = count($items);
+/**
+ * Sanitizes category data based on context.
+ *
+ * @since 2.3.0
+ * @uses sanitize_term() See this function for what context are supported.
+ *
+ * @param object|array $category Category data
+ * @param string $context Optional. Default is 'display'.
+ * @return object|array Same type as $category with sanitized data for safe use.
+ */
+function sanitize_category( $category, $context = 'display' ) {
+	return sanitize_term( $category, 'category', $context );
 }
 
-function _get_category_hierarchy() {
-	$children = get_option('category_children');
-	if ( is_array($children) )
-		return $children;
-
-	$children = array();
-	$categories = get_categories('hide_empty=0&hierarchical=0');
-	foreach ( $categories as $cat ) {
-		if ( $cat->category_parent > 0 )
-			$children[$cat->category_parent][] = $cat->cat_ID;
-	}
-	update_option('category_children', $children);
-
-	return $children;
+/**
+ * Sanitizes data in single category key field.
+ *
+ * @since 2.3.0
+ * @uses sanitize_term_field() See function for more details.
+ *
+ * @param string $field Category key to sanitize
+ * @param mixed $value Category value to sanitize
+ * @param int $cat_id Category ID
+ * @param string $context What filter to use, 'raw', 'display', etc.
+ * @return mixed Same type as $value after $value has been sanitized.
+ */
+function sanitize_category_field( $field, $value, $cat_id, $context ) {
+	return sanitize_term_field( $field, $value, $cat_id, 'category', $context );
 }
-?>
+
+/* Tags */
+
+/**
+ * Retrieves all post tags.
+ *
+ * @since 2.3.0
+ * @see get_terms() For list of arguments to pass.
+ * @uses apply_filters() Calls 'get_tags' hook on array of tags and with $args.
+ *
+ * @param string|array $args Tag arguments to use when retrieving tags.
+ * @return array List of tags.
+ */
+function &get_tags( $args = '' ) {
+	$tags = get_terms( 'post_tag', $args );
+
+	if ( empty( $tags ) ) {
+		$return = array();
+		return $return;
+	}
+
+	$tags = apply_filters( 'get_tags', $tags, $args );
+	return $tags;
+}
+
+/**
+ * Retrieve post tag by tag ID or tag object.
+ *
+ * If you pass the $tag parameter an object, which is assumed to be the tag row
+ * object retrieved the database. It will cache the tag data.
+ *
+ * If you pass $tag an integer of the tag ID, then that tag will
+ * be retrieved from the database, if it isn't already cached, and pass it back.
+ *
+ * If you look at get_term(), then both types will be passed through several
+ * filters and finally sanitized based on the $filter parameter value.
+ *
+ * @since 2.3.0
+ *
+ * @param int|object $tag
+ * @param string $output Optional. Constant OBJECT, ARRAY_A, or ARRAY_N
+ * @param string $filter Optional. Default is raw or no WordPress defined filter will applied.
+ * @return object|array Return type based on $output value.
+ */
+function &get_tag( $tag, $output = OBJECT, $filter = 'raw' ) {
+	return get_term( $tag, 'post_tag', $output, $filter );
+}
+
+/* Cache */
+
+/**
+ * Remove the category cache data based on ID.
+ *
+ * @since 2.1.0
+ * @uses clean_term_cache() Clears the cache for the category based on ID
+ *
+ * @param int $id Category ID
+ */
+function clean_category_cache( $id ) {
+	clean_term_cache( $id, 'category' );
+}
+
+/**
+ * Update category structure to old pre 2.3 from new taxonomy structure.
+ *
+ * This function was added for the taxonomy support to update the new category
+ * structure with the old category one. This will maintain compatibility with
+ * plugins and themes which depend on the old key or property names.
+ *
+ * The parameter should only be passed a variable and not create the array or
+ * object inline to the parameter. The reason for this is that parameter is
+ * passed by reference and PHP will fail unless it has the variable.
+ *
+ * There is no return value, because everything is updated on the variable you
+ * pass to it. This is one of the features with using pass by reference in PHP.
+ *
+ * @since 2.3.0
+ * @access private
+ *
+ * @param array|object $category Category Row object or array
+ */
+function _make_cat_compat( &$category ) {
+	if ( is_object( $category ) ) {
+		$category->cat_ID = &$category->term_id;
+		$category->category_count = &$category->count;
+		$category->category_description = &$category->description;
+		$category->cat_name = &$category->name;
+		$category->category_nicename = &$category->slug;
+		$category->category_parent = &$category->parent;
+	} elseif ( is_array( $category ) && isset( $category['term_id'] ) ) {
+		$category['cat_ID'] = &$category['term_id'];
+		$category['category_count'] = &$category['count'];
+		$category['category_description'] = &$category['description'];
+		$category['cat_name'] = &$category['name'];
+		$category['category_nicename'] = &$category['slug'];
+		$category['category_parent'] = &$category['parent'];
+	}
+}
