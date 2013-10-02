@@ -1,193 +1,82 @@
 <?php
-/**
- * Edit post administration panel.
- *
- * Manage Post actions: post, edit, delete, etc.
- *
- * @package WordPress
- * @subpackage Administration
- */
-
-/** WordPress Administration Bootstrap */
-require_once('./admin.php');
+require_once('admin.php');
 
 $parent_file = 'edit.php';
 $submenu_file = 'edit.php';
 
 wp_reset_vars(array('action', 'safe_mode', 'withcomments', 'posts', 'content', 'edited_post_title', 'comment_error', 'profile', 'trackback_url', 'excerpt', 'showcomments', 'commentstart', 'commentend', 'commentorder'));
 
-if ( isset( $_GET['post'] ) )
- 	$post_id = $post_ID = (int) $_GET['post'];
-elseif ( isset( $_POST['post_ID'] ) )
- 	$post_id = $post_ID = (int) $_POST['post_ID'];
-else
- 	$post_id = $post_ID = 0;
-
-$post = $post_type = $post_type_object = null;
-
-if ( $post_id )
-	$post = get_post( $post_id );
-
-if ( $post ) {
-	$post_type = $post->post_type;
-	$post_type_object = get_post_type_object( $post_type );
-}
-
-/**
- * Redirect to previous page.
- *
- * @param int $post_id Optional. Post ID.
- */
-function redirect_post($post_id = '') {
-	if ( isset($_POST['save']) || isset($_POST['publish']) ) {
-		$status = get_post_status( $post_id );
-
-		if ( isset( $_POST['publish'] ) ) {
-			switch ( $status ) {
-				case 'pending':
-					$message = 8;
-					break;
-				case 'future':
-					$message = 9;
-					break;
-				default:
-					$message = 6;
-			}
-		} else {
-				$message = 'draft' == $status ? 10 : 1;
-		}
-
-		$location = add_query_arg( 'message', $message, get_edit_post_link( $post_id, 'url' ) );
-	} elseif ( isset($_POST['addmeta']) && $_POST['addmeta'] ) {
-		$location = add_query_arg( 'message', 2, wp_get_referer() );
-		$location = explode('#', $location);
-		$location = $location[0] . '#postcustom';
-	} elseif ( isset($_POST['deletemeta']) && $_POST['deletemeta'] ) {
-		$location = add_query_arg( 'message', 3, wp_get_referer() );
-		$location = explode('#', $location);
-		$location = $location[0] . '#postcustom';
-	} elseif ( 'post-quickpress-save-cont' == $_POST['action'] ) {
-		$location = "post.php?action=edit&post=$post_id&message=7";
-	} else {
-		$location = add_query_arg( 'message', 4, get_edit_post_link( $post_id, 'url' ) );
-	}
-
-	wp_redirect( apply_filters( 'redirect_post_location', $location, $post_id ) );
-	exit;
-}
-
 if ( isset( $_POST['deletepost'] ) )
 	$action = 'delete';
-elseif ( isset($_POST['wp-preview']) && 'dopreview' == $_POST['wp-preview'] )
-	$action = 'preview';
-
-$sendback = wp_get_referer();
-if ( ! $sendback ||
-     strpos( $sendback, 'post.php' ) !== false ||
-     strpos( $sendback, 'post-new.php' ) !== false ) {
-	if ( 'attachment' == $post_type ) {
-		$sendback = admin_url( 'upload.php' );
-	} else {
-		$sendback = admin_url( 'edit.php' );
-		$sendback .= ( ! empty( $post_type ) ) ? '?post_type=' . $post_type : '';
-	}
-} else {
-	$sendback = remove_query_arg( array('trashed', 'untrashed', 'deleted', 'ids'), $sendback );
-}
 
 switch($action) {
 case 'postajaxpost':
 case 'post':
-case 'post-quickpress-publish':
-case 'post-quickpress-save':
-	check_admin_referer('add-' . $post_type);
+	$parent_file = 'post-new.php';
+	$submenu_file = 'post-new.php';
+	check_admin_referer('add-post');
 
-	if ( 'post-quickpress-publish' == $action )
-		$_POST['publish'] = 'publish'; // tell write_post() to publish
+	$post_ID = 'post' == $action ? write_post() : edit_post();
 
-	if ( 'post-quickpress-publish' == $action || 'post-quickpress-save' == $action ) {
-		$_POST['comment_status'] = get_option('default_comment_status');
-		$_POST['ping_status'] = get_option('default_ping_status');
-		$post_id = edit_post();
+	// Redirect.
+	if (!empty($_POST['mode'])) {
+	switch($_POST['mode']) {
+		case 'bookmarklet':
+			$location = $_POST['referredby'];
+			break;
+		case 'sidebar':
+			$location = 'sidebar.php?a=b';
+			break;
+		default:
+			$location = 'post-new.php';
+			break;
+		}
 	} else {
-		$post_id = 'postajaxpost' == $action ? edit_post() : write_post();
+		$location = "post-new.php?posted=$post_ID";
 	}
 
-	if ( 0 === strpos( $action, 'post-quickpress' ) ) {
-		$_POST['post_ID'] = $post_id;
-		// output the quickpress dashboard widget
-		require_once(ABSPATH . 'wp-admin/includes/dashboard.php');
-		wp_dashboard_quick_press();
-		exit;
-	}
+	if ( isset($_POST['save']) )
+		$location = "post.php?action=edit&post=$post_ID";
 
-	redirect_post($post_id);
+	if ( empty($post_ID) )
+		$location = 'post-new.php';
+
+	wp_redirect($location);
 	exit();
 	break;
 
 case 'edit':
+	$title = __('Edit');
 	$editing = true;
+	$post_ID = $p = (int) $_GET['post'];
+	$post = get_post($post_ID);
 
-	if ( empty( $post_id ) ) {
-		wp_redirect( admin_url('post.php') );
+	if ( empty($post->ID) ) wp_die( __("You attempted to edit a post that doesn't exist. Perhaps it was deleted?") );
+
+	if ( 'page' == $post->post_type ) {
+		wp_redirect("page.php?action=edit&post=$post_ID");
 		exit();
 	}
 
-	$p = $post_id;
-
-	if ( empty($post->ID) )
-		wp_die( __('You attempted to edit an item that doesn&#8217;t exist. Perhaps it was deleted?') );
-
-	if ( null == $post_type_object )
-		wp_die( __('Unknown post type.') );
-
-	if ( !current_user_can($post_type_object->cap->edit_post, $post_id) )
-		wp_die( __('You are not allowed to edit this item.') );
-
-	if ( 'trash' == $post->post_status )
-		wp_die( __('You can&#8217;t edit this item because it is in the Trash. Please restore it and try again.') );
-
-	$post_type = $post->post_type;
-	if ( 'post' == $post_type ) {
-		$parent_file = "edit.php";
-		$submenu_file = "edit.php";
-		$post_new_file = "post-new.php";
-	} elseif ( 'attachment' == $post_type ) {
-		$parent_file = 'upload.php';
-		$submenu_file = 'upload.php';
-		$post_new_file = 'media-new.php';
-	} else {
-		if ( isset( $post_type_object ) && $post_type_object->show_in_menu && $post_type_object->show_in_menu !== true )
-			$parent_file = $post_type_object->show_in_menu;
-		else
-			$parent_file = "edit.php?post_type=$post_type";
-		$submenu_file = "edit.php?post_type=$post_type";
-		$post_new_file = "post-new.php?post_type=$post_type";
+	if($post->post_status == 'draft') {
+		wp_enqueue_script('prototype');
+		wp_enqueue_script('autosave');
 	}
+	require_once('admin-header.php');
 
-	if ( $last = wp_check_post_lock( $post->ID ) ) {
-		add_action('admin_notices', '_admin_notice_post_locked' );
-	} else {
-		$active_post_lock = wp_set_post_lock( $post->ID );
+	if ( !current_user_can('edit_post', $post_ID) )
+		die ( __('You are not allowed to edit this post.') );
 
-		if ( 'attachment' !== $post_type )
-			wp_enqueue_script('autosave');
-	}
+	$post = get_post_to_edit($post_ID);
 
-	$title = $post_type_object->labels->edit_item;
-	$post = get_post($post_id, OBJECT, 'edit');
-
-	if ( post_type_supports($post_type, 'comments') ) {
-		wp_enqueue_script('admin-comments');
-		enqueue_comment_hotkeys_js();
-	}
-
-	include('./edit-form-advanced.php');
+	include('edit-form-advanced.php');
 
 	break;
 
 case 'editattachment':
-	check_admin_referer('update-post_' . $post_id);
+	$post_id = (int) $_POST['post_ID'];
+
+	check_admin_referer('update-attachment_' . $post_id);
 
 	// Don't let these be changed
 	unset($_POST['guid']);
@@ -200,75 +89,87 @@ case 'editattachment':
 	wp_update_attachment_metadata( $post_id, $newmeta );
 
 case 'editpost':
-	check_admin_referer('update-post_' . $post_id);
+	$post_ID = (int) $_POST['post_ID'];
+	check_admin_referer('update-post_' . $post_ID);
 
-	$post_id = edit_post();
+	$post_ID = edit_post();
 
-	redirect_post($post_id); // Send user on their way while we keep working
+	if ( 'post' == $_POST['originalaction'] ) {
+		if (!empty($_POST['mode'])) {
+		switch($_POST['mode']) {
+			case 'bookmarklet':
+				$location = $_POST['referredby'];
+				break;
+			case 'sidebar':
+				$location = 'sidebar.php?a=b';
+				break;
+			default:
+				$location = 'post-new.php';
+				break;
+			}
+		} else {
+			$location = "post-new.php?posted=$post_ID";
+		}
 
-	exit();
-	break;
+		if ( isset($_POST['save']) )
+			$location = "post.php?action=edit&post=$post_ID";
+	} else {
+		$referredby = '';
+		if ( !empty($_POST['referredby']) )
+			$referredby = preg_replace('|https?://[^/]+|i', '', $_POST['referredby']);
+		$referer = preg_replace('|https?://[^/]+|i', '', wp_get_referer());
 
-case 'trash':
-	check_admin_referer('trash-post_' . $post_id);
+		if ($_POST['save']) {
+			$location = "post.php?action=edit&post=$post_ID";
+		} elseif ($_POST['updatemeta']) {
+			$location = wp_get_referer() . '&message=2#postcustom';
+		} elseif ($_POST['deletemeta']) {
+			$location = wp_get_referer() . '&message=3#postcustom';
+		} elseif (!empty($referredby) && $referredby != $referer) {
+			$location = $_POST['referredby'];
+			if ( $_POST['referredby'] == 'redo' )
+				$location = get_permalink( $post_ID );
+		} elseif ($action == 'editattachment') {
+			$location = 'attachments.php';
+		} else {
+			$location = 'post-new.php';
+		}
+	}
 
-	$post = get_post($post_id);
+	wp_redirect($location); // Send user on their way while we keep working
 
-	if ( !current_user_can($post_type_object->cap->delete_post, $post_id) )
-		wp_die( __('You are not allowed to move this item to the Trash.') );
-
-	if ( ! wp_trash_post($post_id) )
-		wp_die( __('Error in moving to Trash.') );
-
-	wp_redirect( add_query_arg( array('trashed' => 1, 'ids' => $post_id), $sendback ) );
-	exit();
-	break;
-
-case 'untrash':
-	check_admin_referer('untrash-post_' . $post_id);
-
-	if ( !current_user_can($post_type_object->cap->delete_post, $post_id) )
-		wp_die( __('You are not allowed to move this item out of the Trash.') );
-
-	if ( ! wp_untrash_post($post_id) )
-		wp_die( __('Error in restoring from Trash.') );
-
-	wp_redirect( add_query_arg('untrashed', 1, $sendback) );
 	exit();
 	break;
 
 case 'delete':
+	$post_id = (isset($_GET['post']))  ? intval($_GET['post']) : intval($_POST['post_ID']);
 	check_admin_referer('delete-post_' . $post_id);
 
-	if ( !current_user_can($post_type_object->cap->delete_post, $post_id) )
-		wp_die( __('You are not allowed to delete this item.') );
+	$post = & get_post($post_id);
 
-	$force = !EMPTY_TRASH_DAYS;
+	if ( !current_user_can('delete_post', $post_id) )
+		wp_die( __('You are not allowed to delete this post.') );
+
 	if ( $post->post_type == 'attachment' ) {
-		$force = ( $force || !MEDIA_TRASH );
-		if ( ! wp_delete_attachment($post_id, $force) )
-			wp_die( __('Error in deleting.') );
+		if ( ! wp_delete_attachment($post_id) )
+			wp_die( __('Error in deleting...') );
 	} else {
-		if ( !wp_delete_post($post_id, $force) )
-			wp_die( __('Error in deleting.') );
+		if ( !wp_delete_post($post_id) )
+			wp_die( __('Error in deleting...') );
 	}
 
-	wp_redirect( add_query_arg('deleted', 1, $sendback) );
-	exit();
-	break;
-
-case 'preview':
-	check_admin_referer( 'autosave', 'autosavenonce' );
-
-	$url = post_preview();
-
-	wp_redirect($url);
+	$sendback = wp_get_referer();
+	if (strpos($sendback, 'post.php') !== false) $sendback = get_option('siteurl') .'/wp-admin/post-new.php';
+	elseif (strpos($sendback, 'attachments.php') !== false) $sendback = get_option('siteurl') .'/wp-admin/attachments.php';
+	$sendback = preg_replace('|[^a-z0-9-~+_.?#=&;,/:]|i', '', $sendback);
+	wp_redirect($sendback);
 	exit();
 	break;
 
 default:
-	wp_redirect( admin_url('edit.php') );
+	wp_redirect('edit.php');
 	exit();
 	break;
 } // end switch
-include('./admin-footer.php');
+include('admin-footer.php');
+?>

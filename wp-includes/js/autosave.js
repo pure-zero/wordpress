@@ -1,351 +1,158 @@
-var autosave, autosaveLast = '', autosavePeriodical, autosaveOldMessage = '', autosaveDelayPreview = false, notSaved = true, blockSave = false, fullscreen, autosaveLockRelease = true;
+var autosaveLast = '';
+var autosavePeriodical;
 
-jQuery(document).ready( function($) {
-
-	autosaveLast = ( $('#post #title').val() || '' ) + ( $('#post #content').val() || '' );
-	autosavePeriodical = $.schedule({time: autosaveL10n.autosaveInterval * 1000, func: function() { autosave(); }, repeat: true, protect: true});
-
+function autosave_start_timer() {
+	var form = $('post');
+	autosaveLast = form.post_title.value+form.content.value;
+	// Keep autosave_interval in sync with edit_post().
+	autosavePeriodical = new PeriodicalExecuter(autosave, autosaveL10n.autosaveInterval);
 	//Disable autosave after the form has been submitted
-	$("#post").submit(function() {
-		$.cancel(autosavePeriodical);
-		autosaveLockRelease = false;
-	});
-
-	$('input[type="submit"], a.submitdelete', '#submitpost').click(function(){
-		blockSave = true;
-		window.onbeforeunload = null;
-		$(':button, :submit', '#submitpost').each(function(){
-			var t = $(this);
-			if ( t.hasClass('button-primary') )
-				t.addClass('button-primary-disabled');
-			else
-				t.addClass('button-disabled');
-		});
-		if ( $(this).attr('id') == 'publish' )
-			$('#major-publishing-actions .spinner').show();
-		else
-			$('#minor-publishing .spinner').show();
-	});
-
-	window.onbeforeunload = function(){
-		var mce = typeof(tinymce) != 'undefined' ? tinymce.activeEditor : false, title, content;
-
-		if ( mce && !mce.isHidden() ) {
-			if ( mce.isDirty() )
-				return autosaveL10n.saveAlert;
-		} else {
-			if ( fullscreen && fullscreen.settings.visible ) {
-				title = $('#wp-fullscreen-title').val() || '';
-				content = $("#wp_mce_fullscreen").val() || '';
-			} else {
-				title = $('#post #title').val() || '';
-				content = $('#post #content').val() || '';
-			}
-
-			if ( ( title || content ) && title + content != autosaveLast )
-				return autosaveL10n.saveAlert;
-		}
-	};
-
-	$(window).unload( function(e) {
-		if ( ! autosaveLockRelease )
-			return;
-
-		// unload fires (twice) on removing the Thickbox iframe. Make sure we process only the main document unload.
-		if ( e.target && e.target.nodeName != '#document' )
-			return;
-
-		$.ajax({
-			type: 'POST',
-			url: ajaxurl,
-			async: false,
-			data: {
-				action: 'wp-remove-post-lock',
-				_wpnonce: $('#_wpnonce').val(),
-				post_ID: $('#post_ID').val(),
-				active_post_lock: $('#active_post_lock').val()
-			}
-		});
-	} );
-
-	// preview
-	$('#post-preview').click(function(){
-		if ( $('#auto_draft').val() == '1' && notSaved ) {
-			autosaveDelayPreview = true;
-			autosave();
-			return false;
-		}
-		doPreview();
-		return false;
-	});
-
-	doPreview = function() {
-		$('input#wp-preview').val('dopreview');
-		$('form#post').attr('target', 'wp-preview').submit().attr('target', '');
-
-		/*
-		 * Workaround for WebKit bug preventing a form submitting twice to the same action.
-		 * https://bugs.webkit.org/show_bug.cgi?id=28633
-		 */
-		if ( $.browser.safari ) {
-			$('form#post').attr('action', function(index, value) {
-				return value + '?t=' + new Date().getTime();
-			});
-		}
-
-		$('input#wp-preview').val('');
+	if(form.addEventListener) {
+		form.addEventListener("submit", function () { autosavePeriodical.currentlyExecuting = true; }, false);
 	}
-
-	// This code is meant to allow tabbing from Title to Post content.
-	$('#title').on('keydown.editor-focus', function(e) {
-		var ed;
-
-		if ( e.which != 9 )
-			return;
-
-		if ( !e.ctrlKey && !e.altKey && !e.shiftKey ) {
-			if ( typeof(tinymce) != 'undefined' )
-				ed = tinymce.get('content');
-
-			if ( ed && !ed.isHidden() ) {
-				$(this).one('keyup', function(e){
-					$('#content_tbl td.mceToolbar > a').focus();
-				});
-			} else {
-				$('#content').focus();
-			}
-
-			e.preventDefault();
-		}
-	});
-
-	// autosave new posts after a title is typed but not if Publish or Save Draft is clicked
-	if ( '1' == $('#auto_draft').val() ) {
-		$('#title').blur( function() {
-			if ( !this.value || $('#auto_draft').val() != '1' )
-				return;
-			delayed_autosave();
-		});
+	if(form.attachEvent) {
+		form.save ? form.save.attachEvent("onclick", function () { autosavePeriodical.currentlyExecuting = true; }) : null;
+		form.submit ? form.submit.attachEvent("onclick", function () { autosavePeriodical.currentlyExecuting = true; }) : null;
+		form.publish ? form.publish.attachEvent("onclick", function () { autosavePeriodical.currentlyExecuting = true; }) : null;
+		form.deletepost ? form.deletepost.attachEvent("onclick", function () { autosavePeriodical.currentlyExecuting = true; }) : null;
 	}
-});
+}
+addLoadEvent(autosave_start_timer)
 
-function autosave_parse_response(response) {
-	var res = wpAjax.parseAjaxResponse(response, 'autosave'), message = '', postID, sup;
-
-	if ( res && res.responses && res.responses.length ) {
-		message = res.responses[0].data; // The saved message or error.
-		// someone else is editing: disable autosave, set errors
-		if ( res.responses[0].supplemental ) {
-			sup = res.responses[0].supplemental;
-			if ( 'disable' == sup['disable_autosave'] ) {
-				autosave = function() {};
-				autosaveLockRelease = false;
-				res = { errors: true };
-			}
-
-			if ( sup['active-post-lock'] ) {
-				jQuery('#active_post_lock').val( sup['active-post-lock'] );
-			}
-
-			if ( sup['alert'] ) {
-				jQuery('#autosave-alert').remove();
-				jQuery('#titlediv').after('<div id="autosave-alert" class="error below-h2"><p>' + sup['alert'] + '</p></div>');
-			}
-
-			jQuery.each(sup, function(selector, value) {
-				if ( selector.match(/^replace-/) ) {
-					jQuery('#'+selector.replace('replace-', '')).val(value);
-				}
-			});
-		}
-
-		// if no errors: add slug UI
-		if ( !res.errors ) {
-			postID = parseInt( res.responses[0].id, 10 );
-			if ( !isNaN(postID) && postID > 0 ) {
-				autosave_update_slug(postID);
-			}
-		}
-	}
-	if ( message ) { // update autosave message
-		jQuery('.autosave-message').html(message);
-	} else if ( autosaveOldMessage && res ) {
-		jQuery('.autosave-message').html( autosaveOldMessage );
-	}
-	return res;
+function autosave_cur_time() {
+	var now = new Date();
+	return "" + ((now.getHours() >12) ? now.getHours() -12 : now.getHours()) + 
+	((now.getMinutes() < 10) ? ":0" : ":") + now.getMinutes() +
+	((now.getSeconds() < 10) ? ":0" : ":") + now.getSeconds();
 }
 
-// called when autosaving pre-existing post
-function autosave_saved(response) {
-	blockSave = false;
-	autosave_parse_response(response); // parse the ajax response
-	autosave_enable_buttons(); // re-enable disabled form buttons
+function autosave_update_nonce() {
+	var response = nonceAjax.response;
+	document.getElementsByName('_wpnonce')[0].value = response;
 }
 
-// called when autosaving new post
-function autosave_saved_new(response) {
-	blockSave = false;
-	var res = autosave_parse_response(response), postID;
-	if ( res && res.responses.length && !res.errors ) {
-		// An ID is sent only for real auto-saves, not for autosave=0 "keepalive" saves
-		postID = parseInt( res.responses[0].id, 10 );
-		if ( !isNaN(postID) && postID > 0 ) {
-			notSaved = false;
-			jQuery('#auto_draft').val('0'); // No longer an auto-draft
-		}
-		autosave_enable_buttons();
-		if ( autosaveDelayPreview ) {
-			autosaveDelayPreview = false;
-			doPreview();
-		}
+function autosave_update_post_ID() {
+	var response = autosaveAjax.response;
+	var res = parseInt(response);
+	var message;
+
+	if(isNaN(res)) {
+		message = autosaveL10n.errorText.replace(/%response%/g, response);
 	} else {
-		autosave_enable_buttons(); // re-enable disabled form buttons
+		message = autosaveL10n.saveText.replace(/%time%/g, autosave_cur_time());
+		$('post_ID').name = "post_ID";
+		$('post_ID').value = res;
+		// We need new nonces
+		nonceAjax = new sack();
+		nonceAjax.element = null;
+		nonceAjax.setVar("action", "autosave-generate-nonces");
+		nonceAjax.setVar("post_ID", res);
+		nonceAjax.setVar("cookie", document.cookie);
+		nonceAjax.setVar("post_type", $('post_type').value);
+		nonceAjax.requestFile = autosaveL10n.requestFile;
+		nonceAjax.onCompletion = autosave_update_nonce;
+		nonceAjax.method = "POST";
+		nonceAjax.runAJAX();
+		$('hiddenaction').value = 'editpost';
 	}
-}
-
-function autosave_update_slug(post_id) {
-	// create slug area only if not already there
-	if ( 'undefined' != makeSlugeditClickable && jQuery.isFunction(makeSlugeditClickable) && !jQuery('#edit-slug-box > *').size() ) {
-		jQuery.post( ajaxurl, {
-				action: 'sample-permalink',
-				post_id: post_id,
-				new_title: fullscreen && fullscreen.settings.visible ? jQuery('#wp-fullscreen-title').val() : jQuery('#title').val(),
-				samplepermalinknonce: jQuery('#samplepermalinknonce').val()
-			},
-			function(data) {
-				if ( data !== '-1' ) {
-					jQuery('#edit-slug-box').html(data);
-					makeSlugeditClickable();
-				}
-			}
-		);
-	}
+	$('autosave').innerHTML = message;
+	autosave_enable_buttons();
 }
 
 function autosave_loading() {
-	jQuery('.autosave-message').html(autosaveL10n.savingText);
+	$('autosave').innerHTML = autosaveL10n.savingText;
 }
 
-function autosave_enable_buttons() {
-	// delay that a bit to avoid some rare collisions while the DOM is being updated.
-	setTimeout(function(){
-		jQuery(':button, :submit', '#submitpost').removeAttr('disabled');
-		jQuery('.spinner', '#submitpost').hide();
-	}, 500);
+function autosave_saved() {
+	var response = autosaveAjax.response;
+	var res = parseInt(response);
+	var message;
+
+	if(isNaN(res)) {
+		message = autosaveL10n.errorText.replace(/%response%/g, response);
+	} else {
+		message = autosaveL10n.saveText.replace(/%time%/g, autosave_cur_time());
+	}
+	$('autosave').innerHTML = message;
+	autosave_enable_buttons();
 }
 
 function autosave_disable_buttons() {
-	jQuery(':button, :submit', '#submitpost').prop('disabled', true);
-	// Re-enable 5 sec later. Just gives autosave a head start to avoid collisions.
-	setTimeout(autosave_enable_buttons, 5000);
+	var form = $('post');
+	form.save ? form.save.disabled = 'disabled' : null;
+	form.submit ? form.submit.disabled = 'disabled' : null;
+	form.publish ? form.publish.disabled = 'disabled' : null;
+	form.deletepost ? form.deletepost.disabled = 'disabled' : null;
+	setTimeout('autosave_enable_buttons();', 1000); // Re-enable 1 sec later.  Just gives autosave a head start to avoid collisions.
 }
 
-function delayed_autosave() {
-	setTimeout(function(){
-		if ( blockSave )
-			return;
-		autosave();
-	}, 200);
+function autosave_enable_buttons() {
+	var form = $('post');
+	form.save ? form.save.disabled = '' : null;
+	form.submit ? form.submit.disabled = '' : null;
+	form.publish ? form.publish.disabled = '' : null;
+	form.deletepost ? form.deletepost.disabled = '' : null;
 }
 
-autosave = function() {
-	// (bool) is rich editor enabled and active
-	blockSave = true;
-	var rich = (typeof tinymce != "undefined") && tinymce.activeEditor && !tinymce.activeEditor.isHidden(),
-		post_data, doAutoSave, ed, origStatus, successCallback;
+function autosave() {
+	var form = $('post');
+	var rich = ((typeof tinyMCE != "undefined") && tinyMCE.getInstanceById('content')) ? true : false;
+
+	autosaveAjax = new sack();
+
+	/* Gotta do this up here so we can check the length when tinyMCE is in use */
+	if ( typeof tinyMCE == "undefined" || tinyMCE.configs.length < 1 || rich == false ) {
+		autosaveAjax.setVar("content", form.content.value);
+	} else {
+		// Don't run while the TinyMCE spellcheck is on.
+		if(tinyMCE.selectedInstance.spellcheckerOn) return;
+		tinyMCE.wpTriggerSave();
+		autosaveAjax.setVar("content", form.content.value);
+	}
+
+	if(form.post_title.value.length==0 || form.content.value.length==0 || form.post_title.value+form.content.value == autosaveLast)
+		return;
 
 	autosave_disable_buttons();
 
-	post_data = {
-		action: "autosave",
-		post_ID:  jQuery("#post_ID").val() || 0,
-		autosavenonce: jQuery('#autosavenonce').val(),
-		post_type: jQuery('#post_type').val() || "",
-		autosave: 1
-	};
+	autosaveLast = form.post_title.value+form.content.value;
 
-	jQuery('.tags-input').each( function() {
-		post_data[this.name] = this.value;
-	} );
-
-	// We always send the ajax request in order to keep the post lock fresh.
-	// This (bool) tells whether or not to write the post to the DB during the ajax request.
-	doAutoSave = true;
-
-	// No autosave while thickbox is open (media buttons)
-	if ( jQuery("#TB_window").css('display') == 'block' )
-		doAutoSave = false;
-
-	/* Gotta do this up here so we can check the length when tinymce is in use */
-	if ( rich && doAutoSave ) {
-		ed = tinymce.activeEditor;
-		// Don't run while the tinymce spellcheck is on. It resets all found words.
-		if ( ed.plugins.spellchecker && ed.plugins.spellchecker.active ) {
-			doAutoSave = false;
-		} else {
-			if ( 'mce_fullscreen' == ed.id || 'wp_mce_fullscreen' == ed.id )
-				tinymce.get('content').setContent(ed.getContent({format : 'raw'}), {format : 'raw'});
-			tinymce.triggerSave();
-		}
-	}
-
-	if ( fullscreen && fullscreen.settings.visible ) {
-		post_data["post_title"] = jQuery('#wp-fullscreen-title').val() || '';
-		post_data["content"] = jQuery("#wp_mce_fullscreen").val() || '';
-	} else {
-		post_data["post_title"] = jQuery("#title").val() || '';
-		post_data["content"] = jQuery("#content").val() || '';
-	}
-
-	if ( jQuery('#post_name').val() )
-		post_data["post_name"] = jQuery('#post_name').val();
-
-	// Nothing to save or no change.
-	if ( ( post_data["post_title"].length == 0 && post_data["content"].length == 0 ) || post_data["post_title"] + post_data["content"] == autosaveLast ) {
-		doAutoSave = false;
-	}
-
-	origStatus = jQuery('#original_post_status').val();
-
+	cats = document.getElementsByName("post_category[]");
 	goodcats = ([]);
-	jQuery("[name='post_category[]']:checked").each( function(i) {
-		goodcats.push(this.value);
-	} );
-	post_data["catslist"] = goodcats.join(",");
+	for(i=0;i<cats.length;i++) {
+		if(cats[i].checked)
+			goodcats.push(cats[i].value);
+	}
+	catslist = goodcats.join(",");
 
-	if ( jQuery("#comment_status").prop("checked") )
-		post_data["comment_status"] = 'open';
-	if ( jQuery("#ping_status").prop("checked") )
-		post_data["ping_status"] = 'open';
-	if ( jQuery("#excerpt").size() )
-		post_data["excerpt"] = jQuery("#excerpt").val();
-	if ( jQuery("#post_author").size() )
-		post_data["post_author"] = jQuery("#post_author").val();
-	if ( jQuery("#parent_id").val() )
-		post_data["parent_id"] = jQuery("#parent_id").val();
-	post_data["user_ID"] = jQuery("#user-id").val();
-	if ( jQuery('#auto_draft').val() == '1' )
-		post_data["auto_draft"] = '1';
+	autosaveAjax.setVar("action", "autosave");
+	autosaveAjax.setVar("cookie", document.cookie);
+	autosaveAjax.setVar("catslist", catslist);
+	autosaveAjax.setVar("post_ID", $("post_ID").value);
+	autosaveAjax.setVar("post_title", form.post_title.value);
+	autosaveAjax.setVar("post_type", form.post_type.value);
+	if ( form.comment_status.checked )
+		autosaveAjax.setVar("comment_status", 'open');
+	if ( form.ping_status.checked )
+		autosaveAjax.setVar("ping_status", 'open');
+	if(form.excerpt)
+		autosaveAjax.setVar("excerpt", form.excerpt.value);
 
-	if ( doAutoSave ) {
-		autosaveLast = post_data["post_title"] + post_data["content"];
-		jQuery(document).triggerHandler('wpcountwords', [ post_data["content"] ]);
+	if ( typeof tinyMCE == "undefined" || tinyMCE.configs.length < 1 || rich == false ) {
+		autosaveAjax.setVar("content", form.content.value);
 	} else {
-		post_data['autosave'] = 0;
+		tinyMCE.wpTriggerSave();
+		autosaveAjax.setVar("content", form.content.value);
 	}
 
-	if ( post_data["auto_draft"] == '1' ) {
-		successCallback = autosave_saved_new; // new post
-	} else {
-		successCallback = autosave_saved; // pre-existing post
-	}
-
-	autosaveOldMessage = jQuery('#autosave').html();
-	jQuery.ajax({
-		data: post_data,
-		beforeSend: doAutoSave ? autosave_loading : null,
-		type: "POST",
-		url: ajaxurl,
-		success: successCallback
-	});
+	autosaveAjax.requestFile = autosaveL10n.requestFile;
+	autosaveAjax.method = "POST";
+	autosaveAjax.element = null;
+	autosaveAjax.onLoading = autosave_loading;
+	autosaveAjax.onInteractive = autosave_loading;
+	if(parseInt($("post_ID").value) < 1)
+		autosaveAjax.onCompletion = autosave_update_post_ID;
+	else
+		autosaveAjax.onCompletion = autosave_saved;
+	autosaveAjax.runAJAX();
 }
