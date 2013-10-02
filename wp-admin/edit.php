@@ -1,223 +1,293 @@
 <?php
-require_once('admin.php');
+/**
+ * Edit Posts Administration Screen.
+ *
+ * @package WordPress
+ * @subpackage Administration
+ */
 
-$title = __('Posts');
-$parent_file = 'edit.php';
-wp_enqueue_script( 1 == $_GET['c'] ? 'admin-comments' : 'listman' );
-require_once('admin-header.php');
+/** WordPress Administration Bootstrap */
+require_once( './admin.php' );
 
-$_GET['m']   = (int) $_GET['m'];
-$_GET['cat'] = (int) $_GET['cat'];
-$post_stati  = array(	//	array( adj, noun )
-			'publish' => array(__('Published'), __('Published posts')),
-			'future' => array(__('Scheduled'), __('Scheduled posts')),
-			'pending' => array(__('Pending Review'), __('Pending posts')),
-			'draft' => array(__('Draft'), _c('Drafts|manage posts header')),
-			'private' => array(__('Private'), __('Private posts'))
-		);
+if ( ! $typenow )
+	wp_die( __( 'Invalid post type' ) );
 
-$avail_post_stati = $wpdb->get_col("SELECT DISTINCT post_status FROM $wpdb->posts WHERE post_type = 'post'");
+$post_type = $typenow;
+$post_type_object = get_post_type_object( $post_type );
 
-$post_status_q = '';
-$post_status_label = __('Posts');
-if ( isset($_GET['post_status']) && in_array( $_GET['post_status'], array_keys($post_stati) ) ) {
-	$post_status_label = $post_stati[$_GET['post_status']][1];
-	$post_status_q = '&post_status=' . $_GET['post_status'];
-}
-?>
+if ( ! $post_type_object )
+	wp_die( __( 'Invalid post type' ) );
 
-<div class="wrap">
+if ( ! current_user_can( $post_type_object->cap->edit_posts ) )
+	wp_die( __( 'Cheatin&#8217; uh?' ) );
 
-<?php
+$wp_list_table = _get_list_table('WP_Posts_List_Table');
+$pagenum = $wp_list_table->get_pagenum();
 
-if ( 'pending' === $_GET['post_status'] ) {
-	$order = 'ASC';
-	$orderby = 'modified';
-} elseif ( 'draft' === $_GET['post_status'] ) {
-	$order = 'DESC';
-	$orderby = 'modified';
-} else {
-	$order = 'DESC';
-	$orderby = 'date';
-}
-
-wp("what_to_show=posts$post_status_q&posts_per_page=15&order=$order&orderby=$orderby");
-
-// define the columns to display, the syntax is 'internal name' => 'display name'
-$posts_columns = array();
-$posts_columns['id'] = '<div style="text-align: center">' . __('ID') . '</div>';
-if ( 'draft' === $_GET['post_status'] )
-	$posts_columns['modified'] = __('Modified');
-elseif ( 'pending' === $_GET['post_status'] )
-	$posts_columns['modified'] = __('Submitted');
-else
-	$posts_columns['date'] = __('When');
-$posts_columns['title'] = __('Title');
-$posts_columns['categories'] = __('Categories');
-if ( !in_array($_GET['post_status'], array('pending', 'draft', 'future')) )
-	$posts_columns['comments'] = '<div style="text-align: center">' . __('Comments') . '</div>';
-$posts_columns['author'] = __('Author');
-
-$posts_columns = apply_filters('manage_posts_columns', $posts_columns);
-
-// you can not edit these at the moment
-$posts_columns['control_view']   = '';
-$posts_columns['control_edit']   = '';
-$posts_columns['control_delete'] = '';
-
-?>
-
-<h2><?php
-if ( is_single() ) {
-	printf(__('Comments on %s'), apply_filters( "the_title", $post->post_title));
-} else {
-	if ( $post_listing_pageable && !is_archive() && !is_search() )
-		$h2_noun = is_paged() ? sprintf(__( 'Previous %s' ), $post_status_label) : sprintf(__('Latest %s'), $post_status_label);
-	else
-		$h2_noun = $post_status_label;
-	// Use $_GET instead of is_ since they can override each other
-	$h2_author = '';
-	$_GET['author'] = (int) $_GET['author'];
-	if ( $_GET['author'] != 0 ) {
-		if ( $_GET['author'] == '-' . $user_ID ) { // author exclusion
-			$h2_author = ' ' . __('by other authors');
-		} else {
-			$author_user = get_userdata( get_query_var( 'author' ) );
-			$h2_author = ' ' . sprintf(__('by %s'), wp_specialchars( $author_user->display_name ));
-		}
+// Back-compat for viewing comments of an entry
+foreach ( array( 'p', 'attachment_id', 'page_id' ) as $_redirect ) {
+	if ( ! empty( $_REQUEST[ $_redirect ] ) ) {
+		wp_redirect( admin_url( 'edit-comments.php?p=' . absint( $_REQUEST[ $_redirect ] ) ) );
+		exit;
 	}
-	$h2_search = isset($_GET['s'])   && $_GET['s']   ? ' ' . sprintf(__('matching &#8220;%s&#8221;'), wp_specialchars( get_search_query() ) ) : '';
-	$h2_cat    = isset($_GET['cat']) && $_GET['cat'] ? ' ' . sprintf( __('in &#8220;%s&#8221;'), single_cat_title('', false) ) : '';
-	$h2_month  = isset($_GET['m'])   && $_GET['m']   ? ' ' . sprintf( __('during %s'), single_month_title(' ', false) ) : '';
-	printf( _c( '%1$s%2$s%3$s%4$s%5$s|You can reorder these: 1: Posts, 2: by {s}, 3: matching {s}, 4: in {s}, 5: during {s}' ), $h2_noun, $h2_author, $h2_search, $h2_cat, $h2_month );
 }
+unset( $_redirect );
+
+if ( 'post' != $post_type ) {
+	$parent_file = "edit.php?post_type=$post_type";
+	$submenu_file = "edit.php?post_type=$post_type";
+	$post_new_file = "post-new.php?post_type=$post_type";
+} else {
+	$parent_file = 'edit.php';
+	$submenu_file = 'edit.php';
+	$post_new_file = 'post-new.php';
+}
+
+$doaction = $wp_list_table->current_action();
+
+if ( $doaction ) {
+	check_admin_referer('bulk-posts');
+
+	$sendback = remove_query_arg( array('trashed', 'untrashed', 'deleted', 'ids'), wp_get_referer() );
+	if ( ! $sendback )
+		$sendback = admin_url( $parent_file );
+	$sendback = add_query_arg( 'paged', $pagenum, $sendback );
+	if ( strpos($sendback, 'post.php') !== false )
+		$sendback = admin_url($post_new_file);
+
+	if ( 'delete_all' == $doaction ) {
+		$post_status = preg_replace('/[^a-z0-9_-]+/i', '', $_REQUEST['post_status']);
+		if ( get_post_status_object($post_status) ) // Check the post status exists first
+			$post_ids = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type=%s AND post_status = %s", $post_type, $post_status ) );
+		$doaction = 'delete';
+	} elseif ( isset( $_REQUEST['media'] ) ) {
+		$post_ids = $_REQUEST['media'];
+	} elseif ( isset( $_REQUEST['ids'] ) ) {
+		$post_ids = explode( ',', $_REQUEST['ids'] );
+	} elseif ( !empty( $_REQUEST['post'] ) ) {
+		$post_ids = array_map('intval', $_REQUEST['post']);
+	}
+
+	if ( !isset( $post_ids ) ) {
+		wp_redirect( $sendback );
+		exit;
+	}
+
+	switch ( $doaction ) {
+		case 'trash':
+			$trashed = 0;
+			foreach( (array) $post_ids as $post_id ) {
+				if ( !current_user_can($post_type_object->cap->delete_post, $post_id) )
+					wp_die( __('You are not allowed to move this item to the Trash.') );
+
+				if ( !wp_trash_post($post_id) )
+					wp_die( __('Error in moving to Trash.') );
+
+				$trashed++;
+			}
+			$sendback = add_query_arg( array('trashed' => $trashed, 'ids' => join(',', $post_ids) ), $sendback );
+			break;
+		case 'untrash':
+			$untrashed = 0;
+			foreach( (array) $post_ids as $post_id ) {
+				if ( !current_user_can($post_type_object->cap->delete_post, $post_id) )
+					wp_die( __('You are not allowed to restore this item from the Trash.') );
+
+				if ( !wp_untrash_post($post_id) )
+					wp_die( __('Error in restoring from Trash.') );
+
+				$untrashed++;
+			}
+			$sendback = add_query_arg('untrashed', $untrashed, $sendback);
+			break;
+		case 'delete':
+			$deleted = 0;
+			foreach( (array) $post_ids as $post_id ) {
+				$post_del = get_post($post_id);
+
+				if ( !current_user_can($post_type_object->cap->delete_post, $post_id) )
+					wp_die( __('You are not allowed to delete this item.') );
+
+				if ( $post_del->post_type == 'attachment' ) {
+					if ( ! wp_delete_attachment($post_id) )
+						wp_die( __('Error in deleting...') );
+				} else {
+					if ( !wp_delete_post($post_id) )
+						wp_die( __('Error in deleting...') );
+				}
+				$deleted++;
+			}
+			$sendback = add_query_arg('deleted', $deleted, $sendback);
+			break;
+		case 'edit':
+			if ( isset($_REQUEST['bulk_edit']) ) {
+				$done = bulk_edit_posts($_REQUEST);
+
+				if ( is_array($done) ) {
+					$done['updated'] = count( $done['updated'] );
+					$done['skipped'] = count( $done['skipped'] );
+					$done['locked'] = count( $done['locked'] );
+					$sendback = add_query_arg( $done, $sendback );
+				}
+			}
+			break;
+	}
+
+	$sendback = remove_query_arg( array('action', 'action2', 'tags_input', 'post_author', 'comment_status', 'ping_status', '_status', 'post', 'bulk_edit', 'post_view'), $sendback );
+
+	wp_redirect($sendback);
+	exit();
+} elseif ( ! empty($_REQUEST['_wp_http_referer']) ) {
+	 wp_redirect( remove_query_arg( array('_wp_http_referer', '_wpnonce'), stripslashes($_SERVER['REQUEST_URI']) ) );
+	 exit;
+}
+
+$wp_list_table->prepare_items();
+
+wp_enqueue_script('inline-edit-post');
+
+$title = $post_type_object->labels->name;
+
+if ( 'post' == $post_type ) {
+	get_current_screen()->add_help_tab( array(
+	'id'		=> 'overview',
+	'title'		=> __('Overview'),
+	'content'	=>
+		'<p>' . __('This screen provides access to all of your posts. You can customize the display of this screen to suit your workflow.') . '</p>'
+	) );
+	get_current_screen()->add_help_tab( array(
+	'id'		=> 'screen-content',
+	'title'		=> __('Screen Content'),
+	'content'	=>
+		'<p>' . __('You can customize the display of this screen&#8217;s contents in a number of ways:') . '</p>' .
+		'<ul>' .
+			'<li>' . __('You can hide/display columns based on your needs and decide how many posts to list per screen using the Screen Options tab.') . '</li>' .
+			'<li>' . __('You can filter the list of posts by post status using the text links in the upper left to show All, Published, Draft, or Trashed posts. The default view is to show all posts.') . '</li>' .
+			'<li>' . __('You can view posts in a simple title list or with an excerpt. Choose the view you prefer by clicking on the icons at the top of the list on the right.') . '</li>' .
+			'<li>' . __('You can refine the list to show only posts in a specific category or from a specific month by using the dropdown menus above the posts list. Click the Filter button after making your selection. You also can refine the list by clicking on the post author, category or tag in the posts list.') . '</li>' .
+		'</ul>'
+	) );
+	get_current_screen()->add_help_tab( array(
+	'id'		=> 'action-links',
+	'title'		=> __('Available Actions'),
+	'content'	=>
+		'<p>' . __('Hovering over a row in the posts list will display action links that allow you to manage your post. You can perform the following actions:') . '</p>' .
+		'<ul>' .
+			'<li>' . __('<strong>Edit</strong> takes you to the editing screen for that post. You can also reach that screen by clicking on the post title.') . '</li>' .
+			'<li>' . __('<strong>Quick Edit</strong> provides inline access to the metadata of your post, allowing you to update post details without leaving this screen.') . '</li>' .
+			'<li>' . __('<strong>Trash</strong> removes your post from this list and places it in the trash, from which you can permanently delete it.') . '</li>' .
+			'<li>' . __('<strong>Preview</strong> will show you what your draft post will look like if you publish it. View will take you to your live site to view the post. Which link is available depends on your post&#8217;s status.') . '</li>' .
+		'</ul>'
+	) );
+	get_current_screen()->add_help_tab( array(
+	'id'		=> 'bulk-actions',
+	'title'		=> __('Bulk Actions'),
+	'content'	=>
+		'<p>' . __('You can also edit or move multiple posts to the trash at once. Select the posts you want to act on using the checkboxes, then select the action you want to take from the Bulk Actions menu and click Apply.') . '</p>' .
+				'<p>' . __('When using Bulk Edit, you can change the metadata (categories, author, etc.) for all selected posts at once. To remove a post from the grouping, just click the x next to its name in the Bulk Edit area that appears.') . '</p>'
+	) );
+
+	get_current_screen()->set_help_sidebar(
+	'<p><strong>' . __('For more information:') . '</strong></p>' .
+	'<p>' . __('<a href="http://codex.wordpress.org/Posts_Screen" target="_blank">Documentation on Managing Posts</a>') . '</p>' .
+	'<p>' . __('<a href="http://wordpress.org/support/" target="_blank">Support Forums</a>') . '</p>'
+	);
+
+} elseif ( 'page' == $post_type ) {
+	get_current_screen()->add_help_tab( array(
+	'id'		=> 'overview',
+	'title'		=> __('Overview'),
+	'content'	=>
+		'<p>' . __('Pages are similar to posts in that they have a title, body text, and associated metadata, but they are different in that they are not part of the chronological blog stream, kind of like permanent posts. Pages are not categorized or tagged, but can have a hierarchy. You can nest pages under other pages by making one the &#8220;Parent&#8221; of the other, creating a group of pages.') . '</p>'
+	) );
+	get_current_screen()->add_help_tab( array(
+	'id'		=> 'managing-pages',
+	'title'		=> __('Managing Pages'),
+	'content'	=>
+		'<p>' . __('Managing pages is very similar to managing posts, and the screens can be customized in the same way.') . '</p>' .
+		'<p>' . __('You can also perform the same types of actions, including narrowing the list by using the filters, acting on a page using the action links that appear when you hover over a row, or using the Bulk Actions menu to edit the metadata for multiple pages at once.') . '</p>'
+	) );
+
+	get_current_screen()->set_help_sidebar(
+	'<p><strong>' . __('For more information:') . '</strong></p>' .
+	'<p>' . __('<a href="http://codex.wordpress.org/Pages_Screen" target="_blank">Documentation on Managing Pages</a>') . '</p>' .
+	'<p>' . __('<a href="http://wordpress.org/support/" target="_blank">Support Forums</a>') . '</p>'
+	);
+}
+
+add_screen_option( 'per_page', array( 'label' => $title, 'default' => 20, 'option' => 'edit_' . $post_type . '_per_page' ) );
+
+require_once('./admin-header.php');
+?>
+<div class="wrap">
+<?php screen_icon(); ?>
+<h2><?php
+echo esc_html( $post_type_object->labels->name );
+if ( current_user_can( $post_type_object->cap->create_posts ) )
+	echo ' <a href="' . esc_url( $post_new_file ) . '" class="add-new-h2">' . esc_html( $post_type_object->labels->add_new ) . '</a>';
+if ( ! empty( $_REQUEST['s'] ) )
+	printf( ' <span class="subtitle">' . __('Search results for &#8220;%s&#8221;') . '</span>', get_search_query() );
 ?></h2>
 
-<form name="searchform" id="searchform" action="" method="get">
-	<fieldset><legend><?php _e('Search terms&hellip;'); ?></legend>
-		<input type="text" name="s" id="s" value="<?php the_search_query(); ?>" size="17" />
-	</fieldset>
-
-	<fieldset><legend><?php _e('Status&hellip;'); ?></legend>
-		<select name='post_status'>
-			<option<?php selected( @$_GET['post_status'], 0 ); ?> value='0'><?php _e('Any'); ?></option>
-<?php	foreach ( $post_stati as $status => $label ) : if ( !in_array($status, $avail_post_stati) ) continue; ?>
-			<option<?php selected( @$_GET['post_status'], $status ); ?> value='<?php echo $status; ?>'><?php echo $label[0]; ?></option>
-<?php	endforeach; ?>
-		</select>
-	</fieldset>
-
-<?php
-$editable_ids = get_editable_user_ids( $user_ID );
-if ( $editable_ids && count( $editable_ids ) > 1 ) :
+<?php if ( isset( $_REQUEST['locked'] ) || isset( $_REQUEST['updated'] ) || isset( $_REQUEST['deleted'] ) || isset( $_REQUEST['trashed'] ) || isset( $_REQUEST['untrashed'] ) ) {
+	$messages = array();
 ?>
-	<fieldset><legend><?php _e('Author&hellip;'); ?></legend>
-		<?php wp_dropdown_users( array('include' => $editable_ids, 'show_option_all' => __('Any'), 'name' => 'author', 'selected' => isset($_GET['author']) ? $_GET['author'] : 0) ); ?>
-	</fieldset>
+<div id="message" class="updated"><p>
+<?php if ( isset( $_REQUEST['updated'] ) && $updated = absint( $_REQUEST['updated'] ) ) {
+	$messages[] = sprintf( _n( '%s post updated.', '%s posts updated.', $updated ), number_format_i18n( $updated ) );
+}
 
-<?php
-endif;
+if ( isset( $_REQUEST['locked'] ) && $locked = absint( $_REQUEST['locked'] ) ) {
+	$messages[] = sprintf( _n( '%s item not updated, somebody is editing it.', '%s items not updated, somebody is editing them.', $locked ), number_format_i18n( $locked ) );
+}
 
-$arc_query = "SELECT DISTINCT YEAR(post_date) AS yyear, MONTH(post_date) AS mmonth FROM $wpdb->posts WHERE post_type = 'post' ORDER BY post_date DESC";
+if ( isset( $_REQUEST['deleted'] ) && $deleted = absint( $_REQUEST['deleted'] ) ) {
+	$messages[] = sprintf( _n( 'Item permanently deleted.', '%s items permanently deleted.', $deleted ), number_format_i18n( $deleted ) );
+}
 
-$arc_result = $wpdb->get_results( $arc_query );
+if ( isset( $_REQUEST['trashed'] ) && $trashed = absint( $_REQUEST['trashed'] ) ) {
+	$messages[] = sprintf( _n( 'Item moved to the Trash.', '%s items moved to the Trash.', $trashed ), number_format_i18n( $trashed ) );
+	$ids = isset($_REQUEST['ids']) ? $_REQUEST['ids'] : 0;
+	$messages[] = '<a href="' . esc_url( wp_nonce_url( "edit.php?post_type=$post_type&doaction=undo&action=untrash&ids=$ids", "bulk-posts" ) ) . '">' . __('Undo') . '</a>';
+}
 
-$month_count = count($arc_result);
+if ( isset( $_REQUEST['untrashed'] ) && $untrashed = absint( $_REQUEST['untrashed'] ) ) {
+	$messages[] = sprintf( _n( 'Item restored from the Trash.', '%s items restored from the Trash.', $untrashed ), number_format_i18n( $untrashed ) );
+}
 
-if ( $month_count && !( 1 == $month_count && 0 == $arc_result[0]->mmonth ) ) { ?>
+if ( $messages )
+	echo join( ' ', $messages );
+unset( $messages );
 
-	<fieldset><legend><?php _e('Month&hellip;') ?></legend>
-		<select name='m'>
-			<option<?php selected( @$_GET['m'], 0 ); ?> value='0'><?php _e('Any'); ?></option>
-		<?php
-		foreach ($arc_result as $arc_row) {
-			if ( $arc_row->yyear == 0 )
-				continue;
-			$arc_row->mmonth = zeroise($arc_row->mmonth, 2);
-
-			if ( $arc_row->yyear . $arc_row->mmonth == $_GET['m'] )
-				$default = ' selected="selected"';
-			else
-				$default = '';
-
-			echo "<option$default value='$arc_row->yyear$arc_row->mmonth'>";
-			echo $wp_locale->get_month($arc_row->mmonth) . " $arc_row->yyear";
-			echo "</option>\n";
-		}
-		?>
-		</select>
-	</fieldset>
-
+$_SERVER['REQUEST_URI'] = remove_query_arg( array( 'locked', 'skipped', 'updated', 'deleted', 'trashed', 'untrashed' ), $_SERVER['REQUEST_URI'] );
+?>
+</p></div>
 <?php } ?>
 
-	<fieldset><legend><?php _e('Category&hellip;') ?></legend>
-		<?php wp_dropdown_categories('show_option_all='.__('All').'&hide_empty=1&hierarchical=1&show_count=1&selected='.$cat);?>
-	</fieldset>
-	<input type="submit" id="post-query-submit" value="<?php _e('Filter &#187;'); ?>" class="button" />
+<?php $wp_list_table->views(); ?>
+
+<form id="posts-filter" action="" method="get">
+
+<?php $wp_list_table->search_box( $post_type_object->labels->search_items, 'post' ); ?>
+
+<input type="hidden" name="post_status" class="post_status_page" value="<?php echo !empty($_REQUEST['post_status']) ? esc_attr($_REQUEST['post_status']) : 'all'; ?>" />
+<input type="hidden" name="post_type" class="post_type_page" value="<?php echo $post_type; ?>" />
+<?php if ( ! empty( $_REQUEST['show_sticky'] ) ) { ?>
+<input type="hidden" name="show_sticky" value="1" />
+<?php } ?>
+
+<?php $wp_list_table->display(); ?>
+
 </form>
 
-<?php do_action('restrict_manage_posts'); ?>
-
-<br style="clear:both;" />
-
-<?php include( 'edit-post-rows.php' ); ?>
+<?php
+if ( $wp_list_table->has_items() )
+	$wp_list_table->inline_edit();
+?>
 
 <div id="ajax-response"></div>
-
-<div class="navigation">
-<div class="alignleft"><?php next_posts_link(__('&laquo; Previous Entries')) ?></div>
-<div class="alignright"><?php previous_posts_link(__('Next Entries &raquo;')) ?></div>
+<br class="clear" />
 </div>
 
 <?php
-
-if ( 1 == count($posts) ) {
-
-	$comments = $wpdb->get_results("SELECT * FROM $wpdb->comments WHERE comment_post_ID = $id AND comment_approved != 'spam' ORDER BY comment_date");
-	if ($comments) {
-		update_comment_cache($comments);
-	?>
-<h3 id="comments"><?php _e('Comments') ?></h3>
-<ol id="the-comment-list" class="commentlist">
-<?php
-$i = 0;
-foreach ($comments as $comment) {
-
-		++$i; $class = '';
-		$post = get_post($comment->comment_post_ID);
-		$authordata = get_userdata($post->post_author);
-			$comment_status = wp_get_comment_status($comment->comment_ID);
-			if ('unapproved' == $comment_status)
-				$class .= ' unapproved';
-			if ($i % 2)
-				$class .= ' alternate';
-			echo "<li id='comment-$comment->comment_ID' class='$class'>";
-?>
-<p><strong><?php comment_author() ?></strong> <?php if ($comment->comment_author_email) { ?>| <?php comment_author_email_link() ?> <?php } if ($comment->comment_author_url && 'http://' != $comment->comment_author_url) { ?> | <?php comment_author_url_link() ?> <?php } ?>| <?php _e('IP:') ?> <a href="edit-comments.php?s=<?php comment_author_IP() ?>&amp;mode=edit"><?php comment_author_IP() ?></a></p>
-
-<?php comment_text() ?>
-
-<p><?php comment_date(__('M j, g:i A')); ?> &#8212; [
-<?php
-if ( current_user_can('edit_post', $comment->comment_post_ID) ) {
-	echo " <a href='comment.php?action=editcomment&amp;c=".$comment->comment_ID."'>" . __('Edit') . '</a>';
-	echo ' | <a href="' . wp_nonce_url('comment.php?action=deletecomment&amp;p=' . $comment->comment_post_ID . '&amp;c=' . $comment->comment_ID, 'delete-comment_' . $comment->comment_ID) . '" onclick="return deleteSomething( \'comment\', ' . $comment->comment_ID . ', \'' . js_escape(sprintf(__("You are about to delete this comment by '%s'.\n'Cancel' to stop, 'OK' to delete."), $comment->comment_author)) . "', theCommentList );\">" . __('Delete') . '</a> ';
-	if ( ('none' != $comment_status) && ( current_user_can('moderate_comments') ) ) {
-		echo '<span class="unapprove"> | <a href="' . wp_nonce_url('comment.php?action=unapprovecomment&amp;p=' . $comment->comment_post_ID . '&amp;c=' . $comment->comment_ID, 'unapprove-comment_' . $comment->comment_ID) . '" onclick="return dimSomething( \'comment\', ' . $comment->comment_ID . ', \'unapproved\', theCommentList );">' . __('Unapprove') . '</a> </span>';
-		echo '<span class="approve"> | <a href="' . wp_nonce_url('comment.php?action=approvecomment&amp;p=' . $comment->comment_post_ID . '&amp;c=' . $comment->comment_ID, 'approve-comment_' . $comment->comment_ID) . '" onclick="return dimSomething( \'comment\', ' . $comment->comment_ID . ', \'unapproved\', theCommentList );">' . __('Approve') . '</a> </span>';
-	}
-	echo " | <a href=\"" . wp_nonce_url("comment.php?action=deletecomment&amp;dt=spam&amp;p=" . $comment->comment_post_ID . "&amp;c=" . $comment->comment_ID, 'delete-comment_' . $comment->comment_ID) . "\" onclick=\"return deleteSomething( 'comment-as-spam', $comment->comment_ID, '" . js_escape(sprintf(__("You are about to mark as spam this comment by '%s'.\n'Cancel' to stop, 'OK' to mark as spam."), $comment->comment_author)) . "', theCommentList );\">" . __('Spam') . "</a> ";
-}
-?> ]
-</p>
-		</li>
-
-<?php //end of the loop, don't delete
-		} // end foreach
-	echo '</ol>';
-	}//end if comments
-	?>
-<?php } ?>
-</div>
-
-<?php include('admin-footer.php'); ?>
+include('./admin-footer.php');
