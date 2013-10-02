@@ -1,1 +1,158 @@
-var autosave,autosaveLast="",autosavePeriodical,autosaveOldMessage="",autosaveDelayPreview=false,notSaved=true,blockSave=false,fullscreen,autosaveLockRelease=true;jQuery(document).ready(function(b){var a=true;autosaveLast=b("#post #title").val()+b("#post #content").val();autosavePeriodical=b.schedule({time:autosaveL10n.autosaveInterval*1000,func:function(){autosave()},repeat:true,protect:true});b("#post").submit(function(){b.cancel(autosavePeriodical);autosaveLockRelease=false});b('input[type="submit"], a.submitdelete',"#submitpost").click(function(){blockSave=true;window.onbeforeunload=null;b(":button, :submit","#submitpost").each(function(){var c=b(this);if(c.hasClass("button-primary")){c.addClass("button-primary-disabled")}else{c.addClass("button-disabled")}});if(b(this).attr("id")=="publish"){b("#ajax-loading").css("visibility","visible")}else{b("#draft-ajax-loading").css("visibility","visible")}});window.onbeforeunload=function(){var c=typeof(tinyMCE)!="undefined"?tinyMCE.activeEditor:false,e,d;if(c&&!c.isHidden()){if(c.isDirty()){return autosaveL10n.saveAlert}}else{if(fullscreen&&fullscreen.settings.visible){e=b("#wp-fullscreen-title").val();d=b("#wp_mce_fullscreen").val()}else{e=b("#post #title").val();d=b("#post #content").val()}if((e||d)&&e+d!=autosaveLast){return autosaveL10n.saveAlert}}};b(window).unload(function(c){if(!autosaveLockRelease){return}if(c.target&&c.target.nodeName!="#document"){return}b.ajax({type:"POST",url:ajaxurl,async:false,data:{action:"wp-remove-post-lock",_wpnonce:b("#_wpnonce").val(),post_ID:b("#post_ID").val(),active_post_lock:b("#active_post_lock").val()}})});b("#post-preview").click(function(){if(b("#auto_draft").val()=="1"&&notSaved){autosaveDelayPreview=true;autosave();return false}doPreview();return false});doPreview=function(){b("input#wp-preview").val("dopreview");b("form#post").attr("target","wp-preview").submit().attr("target","");if(b.browser.safari){b("form#post").attr("action",function(c,d){return d+"?t="+new Date().getTime()})}b("input#wp-preview").val("")};if(typeof tinyMCE!="undefined"){b("#title")[b.browser.opera?"keypress":"keydown"](function(c){if(c.which==9&&!c.shiftKey&&!c.controlKey&&!c.altKey){if((b("#auto_draft").val()=="1")&&(b("#title").val().length>0)){autosave()}if(tinyMCE.activeEditor&&!tinyMCE.activeEditor.isHidden()&&a){c.preventDefault();a=false;tinyMCE.activeEditor.focus();return false}}})}if("1"==b("#auto_draft").val()){b("#title").blur(function(){if(!this.value||b("#auto_draft").val()!="1"){return}delayed_autosave()})}});function autosave_parse_response(c){var d=wpAjax.parseAjaxResponse(c,"autosave"),e="",a,b;if(d&&d.responses&&d.responses.length){e=d.responses[0].data;if(d.responses[0].supplemental){b=d.responses[0].supplemental;if("disable"==b.disable_autosave){autosave=function(){};autosaveLockRelease=false;d={errors:true}}if(b["active-post-lock"]){jQuery("#active_post_lock").val(b["active-post-lock"])}if(b.alert){jQuery("#autosave-alert").remove();jQuery("#titlediv").after('<div id="autosave-alert" class="error below-h2"><p>'+b.alert+"</p></div>")}jQuery.each(b,function(f,g){if(f.match(/^replace-/)){jQuery("#"+f.replace("replace-","")).val(g)}})}if(!d.errors){a=parseInt(d.responses[0].id,10);if(!isNaN(a)&&a>0){autosave_update_slug(a)}}}if(e){jQuery(".autosave-message").html(e)}else{if(autosaveOldMessage&&d){jQuery(".autosave-message").html(autosaveOldMessage)}}return d}function autosave_saved(a){blockSave=false;autosave_parse_response(a);autosave_enable_buttons()}function autosave_saved_new(b){blockSave=false;var c=autosave_parse_response(b),a;if(c&&c.responses.length&&!c.errors){a=parseInt(c.responses[0].id,10);if(!isNaN(a)&&a>0){notSaved=false;jQuery("#auto_draft").val("0")}autosave_enable_buttons();if(autosaveDelayPreview){autosaveDelayPreview=false;doPreview()}}else{autosave_enable_buttons()}}function autosave_update_slug(a){if("undefined"!=makeSlugeditClickable&&jQuery.isFunction(makeSlugeditClickable)&&!jQuery("#edit-slug-box > *").size()){jQuery.post(ajaxurl,{action:"sample-permalink",post_id:a,new_title:fullscreen&&fullscreen.settings.visible?jQuery("#wp-fullscreen-title").val():jQuery("#title").val(),samplepermalinknonce:jQuery("#samplepermalinknonce").val()},function(b){if(b!=="-1"){jQuery("#edit-slug-box").html(b);makeSlugeditClickable()}})}}function autosave_loading(){jQuery(".autosave-message").html(autosaveL10n.savingText)}function autosave_enable_buttons(){setTimeout(function(){jQuery(":button, :submit","#submitpost").removeAttr("disabled");jQuery(".ajax-loading").css("visibility","hidden")},500)}function autosave_disable_buttons(){jQuery(":button, :submit","#submitpost").prop("disabled",true);setTimeout(autosave_enable_buttons,5000)}function delayed_autosave(){setTimeout(function(){if(blockSave){return}autosave()},200)}autosave=function(){blockSave=true;var c=(typeof tinyMCE!="undefined")&&tinyMCE.activeEditor&&!tinyMCE.activeEditor.isHidden(),d,f,b,e,a;autosave_disable_buttons();d={action:"autosave",post_ID:jQuery("#post_ID").val()||0,autosavenonce:jQuery("#autosavenonce").val(),post_type:jQuery("#post_type").val()||"",autosave:1};jQuery(".tags-input").each(function(){d[this.name]=this.value});f=true;if(jQuery("#TB_window").css("display")=="block"){f=false}if(c&&f){b=tinyMCE.activeEditor;if(b.plugins.spellchecker&&b.plugins.spellchecker.active){f=false}else{if("mce_fullscreen"==b.id||"wp_mce_fullscreen"==b.id){tinyMCE.get("content").setContent(b.getContent({format:"raw"}),{format:"raw"})}tinyMCE.triggerSave()}}if(fullscreen&&fullscreen.settings.visible){d.post_title=jQuery("#wp-fullscreen-title").val()||"";d.content=jQuery("#wp_mce_fullscreen").val()||""}else{d.post_title=jQuery("#title").val()||"";d.content=jQuery("#content").val()||""}if(jQuery("#post_name").val()){d.post_name=jQuery("#post_name").val()}if((d.post_title.length==0&&d.content.length==0)||d.post_title+d.content==autosaveLast){f=false}e=jQuery("#original_post_status").val();goodcats=([]);jQuery("[name='post_category[]']:checked").each(function(g){goodcats.push(this.value)});d.catslist=goodcats.join(",");if(jQuery("#comment_status").prop("checked")){d.comment_status="open"}if(jQuery("#ping_status").prop("checked")){d.ping_status="open"}if(jQuery("#excerpt").size()){d.excerpt=jQuery("#excerpt").val()}if(jQuery("#post_author").size()){d.post_author=jQuery("#post_author").val()}if(jQuery("#parent_id").val()){d.parent_id=jQuery("#parent_id").val()}d.user_ID=jQuery("#user-id").val();if(jQuery("#auto_draft").val()=="1"){d.auto_draft="1"}if(f){autosaveLast=d.post_title+d.content;jQuery(document).triggerHandler("wpcountwords",[d.content])}else{d.autosave=0}if(d.auto_draft=="1"){a=autosave_saved_new}else{a=autosave_saved}autosaveOldMessage=jQuery("#autosave").html();jQuery.ajax({data:d,beforeSend:f?autosave_loading:null,type:"POST",url:ajaxurl,success:a})};
+var autosaveLast = '';
+var autosavePeriodical;
+
+function autosave_start_timer() {
+	var form = $('post');
+	autosaveLast = form.post_title.value+form.content.value;
+	// Keep autosave_interval in sync with edit_post().
+	autosavePeriodical = new PeriodicalExecuter(autosave, autosaveL10n.autosaveInterval);
+	//Disable autosave after the form has been submitted
+	if(form.addEventListener) {
+		form.addEventListener("submit", function () { autosavePeriodical.currentlyExecuting = true; }, false);
+	}
+	if(form.attachEvent) {
+		form.save ? form.save.attachEvent("onclick", function () { autosavePeriodical.currentlyExecuting = true; }) : null;
+		form.submit ? form.submit.attachEvent("onclick", function () { autosavePeriodical.currentlyExecuting = true; }) : null;
+		form.publish ? form.publish.attachEvent("onclick", function () { autosavePeriodical.currentlyExecuting = true; }) : null;
+		form.deletepost ? form.deletepost.attachEvent("onclick", function () { autosavePeriodical.currentlyExecuting = true; }) : null;
+	}
+}
+addLoadEvent(autosave_start_timer)
+
+function autosave_cur_time() {
+	var now = new Date();
+	return "" + ((now.getHours() >12) ? now.getHours() -12 : now.getHours()) + 
+	((now.getMinutes() < 10) ? ":0" : ":") + now.getMinutes() +
+	((now.getSeconds() < 10) ? ":0" : ":") + now.getSeconds();
+}
+
+function autosave_update_nonce() {
+	var response = nonceAjax.response;
+	document.getElementsByName('_wpnonce')[0].value = response;
+}
+
+function autosave_update_post_ID() {
+	var response = autosaveAjax.response;
+	var res = parseInt(response);
+	var message;
+
+	if(isNaN(res)) {
+		message = autosaveL10n.errorText.replace(/%response%/g, response);
+	} else {
+		message = autosaveL10n.saveText.replace(/%time%/g, autosave_cur_time());
+		$('post_ID').name = "post_ID";
+		$('post_ID').value = res;
+		// We need new nonces
+		nonceAjax = new sack();
+		nonceAjax.element = null;
+		nonceAjax.setVar("action", "autosave-generate-nonces");
+		nonceAjax.setVar("post_ID", res);
+		nonceAjax.setVar("cookie", document.cookie);
+		nonceAjax.setVar("post_type", $('post_type').value);
+		nonceAjax.requestFile = autosaveL10n.requestFile;
+		nonceAjax.onCompletion = autosave_update_nonce;
+		nonceAjax.method = "POST";
+		nonceAjax.runAJAX();
+		$('hiddenaction').value = 'editpost';
+	}
+	$('autosave').innerHTML = message;
+	autosave_enable_buttons();
+}
+
+function autosave_loading() {
+	$('autosave').innerHTML = autosaveL10n.savingText;
+}
+
+function autosave_saved() {
+	var response = autosaveAjax.response;
+	var res = parseInt(response);
+	var message;
+
+	if(isNaN(res)) {
+		message = autosaveL10n.errorText.replace(/%response%/g, response);
+	} else {
+		message = autosaveL10n.saveText.replace(/%time%/g, autosave_cur_time());
+	}
+	$('autosave').innerHTML = message;
+	autosave_enable_buttons();
+}
+
+function autosave_disable_buttons() {
+	var form = $('post');
+	form.save ? form.save.disabled = 'disabled' : null;
+	form.submit ? form.submit.disabled = 'disabled' : null;
+	form.publish ? form.publish.disabled = 'disabled' : null;
+	form.deletepost ? form.deletepost.disabled = 'disabled' : null;
+	setTimeout('autosave_enable_buttons();', 1000); // Re-enable 1 sec later.  Just gives autosave a head start to avoid collisions.
+}
+
+function autosave_enable_buttons() {
+	var form = $('post');
+	form.save ? form.save.disabled = '' : null;
+	form.submit ? form.submit.disabled = '' : null;
+	form.publish ? form.publish.disabled = '' : null;
+	form.deletepost ? form.deletepost.disabled = '' : null;
+}
+
+function autosave() {
+	var form = $('post');
+	var rich = ((typeof tinyMCE != "undefined") && tinyMCE.getInstanceById('content')) ? true : false;
+
+	autosaveAjax = new sack();
+
+	/* Gotta do this up here so we can check the length when tinyMCE is in use */
+	if ( typeof tinyMCE == "undefined" || tinyMCE.configs.length < 1 || rich == false ) {
+		autosaveAjax.setVar("content", form.content.value);
+	} else {
+		// Don't run while the TinyMCE spellcheck is on.
+		if(tinyMCE.selectedInstance.spellcheckerOn) return;
+		tinyMCE.wpTriggerSave();
+		autosaveAjax.setVar("content", form.content.value);
+	}
+
+	if(form.post_title.value.length==0 || form.content.value.length==0 || form.post_title.value+form.content.value == autosaveLast)
+		return;
+
+	autosave_disable_buttons();
+
+	autosaveLast = form.post_title.value+form.content.value;
+
+	cats = document.getElementsByName("post_category[]");
+	goodcats = ([]);
+	for(i=0;i<cats.length;i++) {
+		if(cats[i].checked)
+			goodcats.push(cats[i].value);
+	}
+	catslist = goodcats.join(",");
+
+	autosaveAjax.setVar("action", "autosave");
+	autosaveAjax.setVar("cookie", document.cookie);
+	autosaveAjax.setVar("catslist", catslist);
+	autosaveAjax.setVar("post_ID", $("post_ID").value);
+	autosaveAjax.setVar("post_title", form.post_title.value);
+	autosaveAjax.setVar("post_type", form.post_type.value);
+	if ( form.comment_status.checked )
+		autosaveAjax.setVar("comment_status", 'open');
+	if ( form.ping_status.checked )
+		autosaveAjax.setVar("ping_status", 'open');
+	if(form.excerpt)
+		autosaveAjax.setVar("excerpt", form.excerpt.value);
+
+	if ( typeof tinyMCE == "undefined" || tinyMCE.configs.length < 1 || rich == false ) {
+		autosaveAjax.setVar("content", form.content.value);
+	} else {
+		tinyMCE.wpTriggerSave();
+		autosaveAjax.setVar("content", form.content.value);
+	}
+
+	autosaveAjax.requestFile = autosaveL10n.requestFile;
+	autosaveAjax.method = "POST";
+	autosaveAjax.element = null;
+	autosaveAjax.onLoading = autosave_loading;
+	autosaveAjax.onInteractive = autosave_loading;
+	if(parseInt($("post_ID").value) < 1)
+		autosaveAjax.onCompletion = autosave_update_post_ID;
+	else
+		autosaveAjax.onCompletion = autosave_saved;
+	autosaveAjax.runAJAX();
+}
