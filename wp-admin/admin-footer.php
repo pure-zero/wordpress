@@ -1,13 +1,47 @@
+<?php
+/**
+ * WordPress Administration Template Footer
+ *
+ * @package WordPress
+ * @subpackage Administration
+ */
 
-<div id="footer"><p><a href="http://wordpress.org/"><img src="../wp-images/wp-small.png" alt="WordPress" /></a><br />
-<?php bloginfo('version'); ?> <br /> 
-<a href="http://codex.wordpress.org/"><?php _e('Documentation'); ?></a> &#8212; <a href="http://wordpress.org/support/"><?php _e('Support Forums'); ?></a> <br />
-<?php printf(__('%s seconds'), number_format(timer_stop(), 2)); ?>
-</p>
+// don't load directly
+if ( !defined('ABSPATH') )
+	die('-1');
+?>
 
+<div class="clear"></div></div><!-- wpbody-content -->
+<div class="clear"></div></div><!-- wpbody -->
+<div class="clear"></div></div><!-- wpcontent -->
+
+<div id="footer">
+<?php do_action( 'in_admin_footer' ); ?>
+<p id="footer-left" class="alignleft"><?php
+$upgrade = apply_filters( 'update_footer', '' );
+$footer_text = array(
+	'<span id="footer-thankyou">' . __( 'Thank you for creating with <a href="http://wordpress.org/">WordPress</a>.' ) . '</span>',
+);
+echo apply_filters( 'admin_footer_text', implode( ' &bull; ', $footer_text ) );
+unset( $footer_text );
+?></p>
+<p id="footer-upgrade" class="alignright"><?php echo $upgrade; ?></p>
+<div class="clear"></div>
 </div>
+<?php
+do_action('admin_footer', '');
+do_action('admin_print_footer_scripts');
+do_action("admin_footer-" . $GLOBALS['hook_suffix']);
 
-<?php do_action('admin_footer', ''); ?>
+// get_site_option() won't exist when auto upgrading from <= 2.7
+if ( function_exists('get_site_option') ) {
+	if ( false === get_site_option('can_compress_scripts') )
+		compression_test();
+}
 
+?>
+
+<div class="clear"></div></div><!-- wpwrap -->
+<script type="text/javascript">if(typeof wpOnload=='function')wpOnload();</script>
 </body>
 </html>
