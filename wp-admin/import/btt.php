@@ -1,24 +1,9 @@
 <?php
-/**
- * BunnyTags Plugin Tag Importer
- *
- * @package WordPress
- * @subpackage Importer
- */
 
-/**
- * BunnyTags Plugin tag converter
- *
- * This will process the BunnyTags plugin tags and convert them to the WordPress
- * 2.3 taxonomy.
- *
- * @since unknown
- */
 class BunnyTags_Import {
 
 	function header() {
 		echo '<div class="wrap">';
-		screen_icon();
 		echo '<h2>'.__('Import Bunny&#8217;s Technorati Tags').'</h2>';
 		echo '<p>'.__('Steps may take a few minutes depending on the size of your database. Please be patient.').'<br /><br /></p>';
 	}
@@ -35,7 +20,7 @@ class BunnyTags_Import {
 		echo '<p><strong>'.__('Don&#8217;t be stupid - backup your database before proceeding!').'</strong></p>';
 		echo '<form action="admin.php?import=btt&amp;step=1" method="post">';
 		wp_nonce_field('import-btt');
-		echo '<p class="submit"><input type="submit" name="submit" class="button" value="'.__('Import Tags').'" /></p>';
+		echo '<p class="submit"><input type="submit" name="submit" value="'.__('Import Tags').'" /></p>';
 		echo '</form>';
 		echo '</div>';
 	}
@@ -105,7 +90,7 @@ class BunnyTags_Import {
 
 		echo '<form action="admin.php?import=btt&amp;step='.($precheck? 2:3).'" method="post">';
 		wp_nonce_field('import-btt');
-		echo '<p class="submit"><input type="submit" name="submit" class="button" value="'.__('Next').'" /></p>';
+		echo '<p class="submit"><input type="submit" name="submit" value="'.__('Next').'" /></p>';
 		echo '</form>';
 		echo '</div>';
 	}
