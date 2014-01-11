@@ -169,31 +169,25 @@ $(document).ready( function() {
 	});
 
 	$('#collapse-menu').on('click.collapse-menu', function(e){
-		var body = $( document.body ), respWidth;
+		var body = $(document.body);
 
 		// reset any compensation for submenus near the bottom of the screen
 		$('#adminmenu div.wp-submenu').css('margin-top', '');
 
-		// WebKit excludes the width of the vertical scrollbar when applying the CSS "@media screen and (max-width: ...)"
-		// and matches $(window).width().
-		// Firefox and IE > 8 include the scrollbar width, so after the jQuery normalization
-		// $(window).width() is 884px but window.innerWidth is 900px.
-		// (using window.innerWidth also excludes IE < 9)
-		respWidth = navigator.userAgent.indexOf('AppleWebKit/') > -1 ? $(window).width() : window.innerWidth;
-
-		if ( respWidth && respWidth < 900 ) {
+		if ( $(window).width() < 900 ) {
 			if ( body.hasClass('auto-fold') ) {
-				body.removeClass('auto-fold').removeClass('folded');
+				body.removeClass('auto-fold');
 				setUserSetting('unfold', 1);
-				setUserSetting('mfold', 'o');
+				body.removeClass('folded');
+				deleteUserSetting('mfold');
 			} else {
 				body.addClass('auto-fold');
-				setUserSetting('unfold', 0);
+				deleteUserSetting('unfold');
 			}
 		} else {
 			if ( body.hasClass('folded') ) {
 				body.removeClass('folded');
-				setUserSetting('mfold', 'o');
+				deleteUserSetting('mfold');
 			} else {
 				body.addClass('folded');
 				setUserSetting('mfold', 'f');
@@ -313,7 +307,7 @@ $(document).ready( function() {
 		$(this).closest( 'table' ).children( 'tbody' ).filter(':visible')
 		.children().children('.check-column').find(':checkbox')
 		.prop('checked', function() {
-			if ( $(this).is(':hidden') )
+			if ( $(this).closest('tr').is(':hidden') )
 				return false;
 			if ( toggle )
 				return $(this).prop( 'checked' );

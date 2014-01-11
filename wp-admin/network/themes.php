@@ -220,8 +220,6 @@ get_current_screen()->set_help_sidebar(
 $title = __('Themes');
 $parent_file = 'themes.php';
 
-wp_enqueue_script( 'theme' );
-
 require_once(ABSPATH . 'wp-admin/admin-header.php');
 
 ?>
