@@ -1,11 +1,12 @@
 <?php
 /**
- * Customize Section Class.
+ * Customize Section Class
  *
  * @package WordPress
  * @subpackage Customize
  * @since 3.4.0
  */
+
 class WP_Customize_Section {
 	public $manager;
 	public $id;
@@ -21,7 +22,6 @@ class WP_Customize_Section {
 	 *
 	 * @since 3.4.0
 	 *
-	 * @param WP_Customize_Manager $manager
 	 * @param string $id An specific ID of the section.
 	 * @param array $args Section arguments.
 	 */
@@ -72,6 +72,7 @@ class WP_Customize_Section {
 		$this->render();
 	}
 
+
 	/**
 	 * Render the section.
 	 *
@@ -79,9 +80,9 @@ class WP_Customize_Section {
 	 */
 	protected function render() {
 		?>
-		<li id="accordion-section-<?php echo esc_attr( $this->id ); ?>" class="control-section accordion-section">
-			<h3 class="accordion-section-title" tabindex="0" title="<?php echo esc_attr( $this->description ); ?>"><?php echo esc_html( $this->title ); ?></h3>
-			<ul class="accordion-section-content">
+		<li id="customize-section-<?php echo esc_attr( $this->id ); ?>" class="control-section customize-section">
+			<h3 class="customize-section-title" title="<?php echo esc_attr( $this->description ); ?>"><?php echo esc_html( $this->title ); ?></h3>
+			<ul class="customize-section-content">
 				<?php
 				foreach ( $this->controls as $control )
 					$control->maybe_render();

@@ -1,13 +1,12 @@
 /*
 Theme Name: Twenty Ten
-Theme URI: http://wordpress.org/themes/twentyten
+Theme URI: http://wordpress.org/
 Description: The 2010 theme for WordPress is stylish, customizable, simple, and readable -- make it yours with a custom menu, header image, and background. Twenty Ten supports six widgetized areas (two in the sidebar, four in the footer) and featured images (thumbnails for gallery posts and custom header images for posts and pages). It includes stylesheets for print and the admin Visual Editor, special styles for posts in the "Asides" and "Gallery" categories, and has an optional one-column page template that removes the sidebar.
 Author: the WordPress team
-Author URI: http://wordpress.org/
-Version: 1.6
+Version: 1.4
 License: GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
-Tags: black, blue, white, two-columns, fixed-width, custom-header, custom-background, threaded-comments, sticky-post, translation-ready, microformats, rtl-language-support, editor-style, custom-menu, flexible-header
+Tags: black, blue, white, two-columns, fixed-width, custom-header, custom-background, threaded-comments, sticky-post, translation-ready, microformats, rtl-language-support, editor-style, custom-menu
 Text Domain: twentyten
 */
 
@@ -146,7 +145,7 @@ h3#reply-title,
 .wp-caption-text {
 	font-family: "Helvetica Neue", Arial, Helvetica, "Nimbus Sans L", sans-serif;
 }
-input[type="submit"] {
+input[type=submit] {
 	font-family: "Helvetica Neue", Arial, Helvetica, "Nimbus Sans L", sans-serif;
 }
 pre {
@@ -308,14 +307,7 @@ sup {
 sub {
 	top: .5ex;
 }
-small {
-	font-size: smaller;
-}
 input[type="text"],
-input[type="password"],
-input[type="email"],
-input[type="url"],
-input[type="number"],
 textarea {
 	background: #f9f9f9;
 	border: 1px solid #ccc;
@@ -445,14 +437,12 @@ div.menu li {
 	display: block;
 }
 #access ul li.current_page_item > a,
-#access ul li.current_page_ancestor > a,
 #access ul li.current-menu-ancestor > a,
 #access ul li.current-menu-item > a,
 #access ul li.current-menu-parent > a {
 	color: #fff;
 }
 * html #access ul li.current_page_item a,
-* html #access ul li.current_page_ancestor a,
 * html #access ul li.current-menu-ancestor a,
 * html #access ul li.current-menu-item a,
 * html #access ul li.current-menu-parent a,
@@ -525,7 +515,7 @@ div.menu li {
 }
 #content tr th,
 #content thead th {
-	color: #777;
+	color: #888;
 	font-size: 12px;
 	font-weight: bold;
 	line-height: 18px;
@@ -565,7 +555,7 @@ div.menu li {
 }
 .page-title a:link,
 .page-title a:visited {
-	color: #777;
+	color: #888;
 	text-decoration: none;
 }
 .page-title a:active,
@@ -589,7 +579,7 @@ div.menu li {
 	color: #ff4b33;
 }
 .entry-meta {
-	color: #777;
+	color: #888;
 	font-size: 12px;
 }
 .entry-meta abbr,
@@ -627,7 +617,7 @@ div.menu li {
 	margin-right: 24px;
 }
 .entry-content label {
-	color: #777;
+	color: #888;
 	font-size: 12px;
 }
 .entry-content select {
@@ -655,7 +645,7 @@ div.menu li {
 	clear: both;
 	color: #000;
 	font-weight: bold;
-	line-height: 48px;
+	margin: 0 0 22px 0;
 	word-spacing: 0.5em;
 }
 .page-link a:link,
@@ -707,13 +697,13 @@ body.page .edit-link {
 }
 .entry-utility {
 	clear: both;
-	color: #777;
+	color: #888;
 	font-size: 12px;
 	line-height: 18px;
 }
 .entry-meta a,
 .entry-utility a {
-	color: #777;
+	color: #888;
 }
 .entry-meta a:hover,
 .entry-utility a:hover {
@@ -791,8 +781,7 @@ img.size-auto,
 img.size-full,
 img.size-large,
 img.size-medium,
-.attachment img,
-.widget-container img {
+.attachment img {
 	max-width: 100%; /* When images are too wide for containing element, force them to fit. */
 	height: auto; /* Override height to match resized width for correct aspect ratio. */
 }
@@ -832,10 +821,9 @@ img.aligncenter {
 }
 .wp-caption img {
 	margin: 5px 5px 0;
-	max-width: 622px; /* caption width - 10px */
 }
 .wp-caption p.wp-caption-text {
-	color: #777;
+	color: #888;
 	font-size: 12px;
 	margin: 5px;
 }
@@ -869,7 +857,7 @@ img.aligncenter {
 	height: auto;
 }
 .gallery .gallery-caption {
-	color: #777;
+	color: #888;
 	font-size: 12px;
 	margin: 0 0 12px;
 }
@@ -892,14 +880,14 @@ img.aligncenter {
 -------------------------------------------------------------- */
 
 .navigation {
-	color: #777;
+	color: #888;
 	font-size: 12px;
 	line-height: 18px;
 	overflow: hidden;
 }
 .navigation a:link,
 .navigation a:visited {
-	color: #777;
+	color: #888;
 	text-decoration: none;
 }
 .navigation a:active,
@@ -997,7 +985,7 @@ h3#comments-title {
 }
 .comment-meta a:link,
 .comment-meta a:visited {
-	color: #777;
+	color: #888;
 	text-decoration: none;
 }
 .comment-meta a:active,
@@ -1014,7 +1002,7 @@ h3#comments-title {
 }
 .reply a,
 a.comment-edit-link {
-	color: #777;
+	color: #888;
 }
 .reply a:hover,
 a.comment-edit-link:hover {
@@ -1041,7 +1029,7 @@ a.comment-edit-link:hover {
 	margin-top: -6px;
 }
 #comments .pingback p {
-	color: #777;
+	color: #888;
 	display: block;
 	font-size: 12px;
 	line-height: 18px;
@@ -1053,7 +1041,7 @@ a.comment-edit-link:hover {
 }
 
 /* Comments form */
-input[type="submit"] {
+input[type=submit] {
 	color: #333;
 }
 #respond {
@@ -1093,7 +1081,7 @@ h3#reply-title {
 	font-weight: bold;
 }
 #respond label {
-	color: #777;
+	color: #888;
 	font-size: 12px;
 }
 #respond input {
@@ -1104,7 +1092,7 @@ h3#reply-title {
 	width: 98%;
 }
 #respond .form-allowed-tags {
-	color: #777;
+	color: #888;
 	font-size: 12px;
 	line-height: 18px;
 }
@@ -1141,14 +1129,7 @@ h3#reply-title {
 	display: none;
 }
 .widget-container {
-	word-wrap: break-word;
-	-webkit-hyphens: auto;
-	-moz-hyphens: auto;
-	hyphens: auto;
 	margin: 0 0 18px 0;
-}
-.widget-container .wp-caption img {
-	margin: auto;
 }
 .widget-title {
 	color: #222;

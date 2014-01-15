@@ -43,6 +43,17 @@ body {
 	line-height: 19px;
 	color: #333;
 	margin: 10px;
+	min-height: 100%;
+}
+
+br[data-mce-bogus] {
+	line-height: 1em;
+	margin-top: -1em;
+}
+
+br[data-mce-bogus]:only-child {
+	line-height: inherit;
+	margin-top: inherit;
 }
 
 .aligncenter,
@@ -99,8 +110,8 @@ td {
 }
 
 /* Styles for the WordPress plugins */
-img.mce-wp-nextpage,
-img.mce-wp-more {
+img.mceWPnextpage,
+img.mceWPmore {
 	border: 0;
 	border-top: 1px dotted #cccccc;
 	display: block;
@@ -109,15 +120,15 @@ img.mce-wp-more {
 	margin: 15px auto 0;
 }
 
-img.mce-wp-more {
+img.mceWPmore {
 	background: transparent url("img/more_bug.gif") no-repeat right top;
 }
 
-img.mce-wp-nextpage {
+img.mceWPnextpage {
     background: transparent url("img/page_bug.gif") no-repeat right top;
 }
 
-img.wp-gallery {
+img.wpGallery {
 	border: 1px dashed #888;
 	background: #f2f8ff url("img/gallery.png") no-repeat scroll center center;
 	width: 99%;
@@ -130,3 +141,4 @@ img.wp-oembed {
 	width: 300px;
 	height: 250px;
 }
+
