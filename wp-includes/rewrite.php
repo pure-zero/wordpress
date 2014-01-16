@@ -31,7 +31,8 @@ function add_feed($feedname, $function) {
 		$wp_rewrite->feeds[] = $feedname;
 	}
 	$hook = 'do_feed_' . $feedname;
-	remove_action($hook, $function, 10, 1);
+	// Remove default function hook
+	remove_action($hook, $hook, 10, 1);
 	add_action($hook, $function, 10, 1);
 	return $hook;
 }
@@ -57,6 +58,20 @@ define('EP_ALL',        8191);
 function add_rewrite_endpoint($name, $places) {
 	global $wp_rewrite;
 	$wp_rewrite->add_endpoint($name, $places);
+}
+
+/**
+  * _wp_filter_taxonomy_base() - filter the URL base for taxonomies, to remove any manually prepended /index.php/
+  * @param string $base the taxonomy base that we're going to filter
+  * @return string
+  * @author Mark Jaquith 
+  */
+function _wp_filter_taxonomy_base( $base ) {
+	if ( !empty( $base ) ) {
+		$base = preg_replace( '|^/index\.php/|', '', $base );
+		$base = trim( $base, '/' );
+	}
+	return $base;
 }
 
 // examine a url (supposedly from this blog) and try to
@@ -137,7 +152,7 @@ function url_to_postid($url) {
 			$query = preg_replace("!^.+\?!", '', $query);
 
 			// Substitute the substring matches into the query.
-			eval("\$query = \"$query\";");
+			eval("\$query = \"" . addslashes($query) . "\";");
 			// Filter out non-public query vars
 			global $wp;
 			parse_str($query, $query_vars);
@@ -432,9 +447,9 @@ class WP_Rewrite {
 		}
 
 		if (empty($this->category_base))
-			$this->category_structure = $this->front . 'category/';
+			$this->category_structure = trailingslashit( $this->front . 'category' );
 		else
-			$this->category_structure = $this->category_base . '/';
+			$this->category_structure = trailingslashit( '/' . $this->root . $this->category_base );
 
 		$this->category_structure .= '%category%';
 
@@ -452,9 +467,9 @@ class WP_Rewrite {
 		}
 
 		if (empty($this->tag_base))
-			$this->tag_structure = $this->front . 'tag/';
+			$this->tag_structure = trailingslashit( $this->front . 'tag' );
 		else
-			$this->tag_structure = $this->tag_base . '/';
+			$this->tag_structure = trailingslashit( '/' . $this->root . $this->tag_base );
 
 		$this->tag_structure .= '%tag%';
 
