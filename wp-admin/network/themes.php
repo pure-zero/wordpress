@@ -8,7 +8,7 @@
  */
 
 /** Load WordPress Administration Bootstrap */
-require_once( dirname( __FILE__ ) . '/admin.php' );
+require_once( './admin.php' );
 
 if ( ! is_multisite() )
 	wp_die( __( 'Multisite support is not enabled.' ) );
@@ -219,8 +219,6 @@ get_current_screen()->set_help_sidebar(
 
 $title = __('Themes');
 $parent_file = 'themes.php';
-
-wp_enqueue_script( 'theme' );
 
 require_once(ABSPATH . 'wp-admin/admin-header.php');
 
