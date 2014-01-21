@@ -7,14 +7,12 @@
  */
 
 /** WordPress Administration Bootstrap */
-require_once( dirname( __FILE__ ) . '/admin.php' );
+require_once('./admin.php');
 
 if ( !current_user_can('switch_themes') && !current_user_can('edit_theme_options') )
 	wp_die( __( 'Cheatin&#8217; uh?' ) );
 
 $wp_list_table = _get_list_table('WP_Themes_List_Table');
-
-$_SERVER['REQUEST_URI'] = remove_query_arg( array( 's', 'features', '_ajax_fetch_list_nonce', '_wp_http_referer', 'paged' ), $_SERVER['REQUEST_URI'] );
 
 if ( current_user_can( 'switch_themes' ) && isset($_GET['action'] ) ) {
 	if ( 'activate' == $_GET['action'] ) {
@@ -56,7 +54,7 @@ if ( current_user_can( 'install_themes' ) ) {
 	if ( is_multisite() ) {
 		$help_install = '<p>' . __('Installing themes on Multisite can only be done from the Network Admin section.') . '</p>';
 	} else {
-		$help_install = '<p>' . sprintf( __('If you would like to see more themes to choose from, click on the &#8220;Install Themes&#8221; tab and you will be able to browse or search for additional themes from the <a href="%s" target="_blank">WordPress.org Theme Directory</a>. Themes in the WordPress.org Theme Directory are designed and developed by third parties, and are compatible with the license WordPress uses. Oh, and they&#8217;re free!'), 'http://wordpress.org/themes/' ) . '</p>';
+		$help_install = '<p>' . sprintf( __('If you would like to see more themes to choose from, click on the &#8220;Install Themes&#8221; tab and you will be able to browse or search for additional themes from the <a href="%s" target="_blank">WordPress.org Theme Directory</a>. Themes in the WordPress.org Theme Directory are designed and developed by third parties, and are compatible with the license WordPress uses. Oh, and they&#8217;re free!'), 'http://wordpress.org/extend/themes/' ) . '</p>';
 	}
 
 	get_current_screen()->add_help_tab( array(
@@ -93,7 +91,7 @@ get_current_screen()->set_help_sidebar(
 wp_enqueue_script( 'theme' );
 wp_enqueue_script( 'customize-loader' );
 
-require_once( ABSPATH . 'wp-admin/admin-header.php' );
+require_once('./admin-header.php');
 ?>
 
 <div class="wrap"><?php
@@ -141,15 +139,6 @@ $customize_title = sprintf( __( 'Customize &#8220;%s&#8221;' ), $ct->display('Na
 		<?php echo $ct->display('Name'); ?>
 	</h4>
 
-<?php
-if ( $ct->errors() && ( ! is_multisite() || current_user_can( 'manage_network_themes' ) ) ) {
-	echo '<p class="error-message">' . sprintf( __( 'ERROR: %s' ), $ct->errors()->get_error_message() ) . '</p>';
-}
-
-// Certain error codes are less fatal than others. We can still display theme information in most cases.
-if ( ! $ct->errors() || ( 1 == count( $ct->errors()->get_error_codes() )
-	&& in_array( $ct->errors()->get_error_code(), array( 'theme_no_parent', 'theme_parent_invalid', 'theme_no_index' ) ) ) ) : ?>
-
 	<div>
 		<ul class="theme-info">
 			<li><?php printf( __('By %s'), $ct->display('Author') ); ?></li>
@@ -170,7 +159,7 @@ if ( ! $ct->errors() || ( 1 == count( $ct->errors()->get_error_codes() )
 	if ( is_array( $submenu ) && isset( $submenu['themes.php'] ) ) {
 		foreach ( (array) $submenu['themes.php'] as $item) {
 			$class = '';
-			if ( 'themes.php' == $item[2] || 'theme-editor.php' == $item[2] || 'customize.php' == $item[2] )
+			if ( 'themes.php' == $item[2] || 'theme-editor.php' == $item[2] )
 				continue;
 			// 0 = name, 1 = capability, 2 = file
 			if ( ( strcmp($self, $item[2]) == 0 && empty($parent_file)) || ($parent_file && ($item[2] == $parent_file)) )
@@ -218,15 +207,13 @@ if ( ! $ct->errors() || ( 1 == count( $ct->errors()->get_error_codes() )
 	endif; // options || edit_theme_options
 	?>
 
-<?php endif; // theme errors ?>
-
 </div>
 
 <br class="clear" />
 <?php
 if ( ! current_user_can( 'switch_themes' ) ) {
 	echo '</div>';
-	require( ABSPATH . 'wp-admin/admin-footer.php' );
+	require( './admin-footer.php' );
 	exit;
 }
 ?>
@@ -305,9 +292,11 @@ if ( ! is_multisite() && current_user_can('edit_themes') && $broken_themes = wp_
 		<th><?php _e('Description'); ?></th>
 	</tr>
 <?php
+	$alt = '';
 	foreach ( $broken_themes as $broken_theme ) {
+		$alt = ('class="alternate"' == $alt) ? '' : 'class="alternate"';
 		echo "
-		<tr>
+		<tr $alt>
 			 <td>" . $broken_theme->get('Name') ."</td>
 			 <td>" . $broken_theme->errors()->get_error_message() . "</td>
 		</tr>";
@@ -319,4 +308,4 @@ if ( ! is_multisite() && current_user_can('edit_themes') && $broken_themes = wp_
 ?>
 </div>
 
-<?php require( ABSPATH . 'wp-admin/admin-footer.php' ); ?>
+<?php require('./admin-footer.php'); ?>

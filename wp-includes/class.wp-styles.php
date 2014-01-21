@@ -50,7 +50,7 @@ class WP_Styles extends WP_Dependencies {
 				$this->concat .= "$handle,";
 				$this->concat_version .= "$handle$ver";
 
-				$this->print_code .= $this->print_inline_style( $handle, false );
+				$this->print_code .= $this->get_data( $handle, 'after' );
 
 				return true;
 			}
@@ -87,8 +87,7 @@ class WP_Styles extends WP_Dependencies {
 
 		if ( $this->do_concat ) {
 			$this->print_html .= $tag;
-			if ( $inline_style = $this->print_inline_style( $handle, false ) )
-				$this->print_html .= sprintf( "<style type='text/css'>\n%s\n</style>\n", $inline_style );
+			$this->print_html .= $this->print_inline_style( $handle, false );
 		} else {
 			echo $tag;
 			$this->print_inline_style( $handle );
