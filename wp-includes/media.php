@@ -73,7 +73,7 @@ function image_downsize($id, $size = 'medium') {
 	}
 	elseif ( $size == 'thumbnail' ) {
 		// fall back to the old thumbnail
-		if ( ($thumb_file = wp_get_attachment_thumb_file($id)) && $info = getimagesize($thumb_file) ) {
+		if ( $thumb_file = wp_get_attachment_thumb_file() && $info = getimagesize($thumb_file) ) {
 			$img_url = str_replace(basename($img_url), basename($thumb_file), $img_url);
 			$width = $info[0];
 			$height = $info[1];
@@ -274,7 +274,7 @@ function image_make_intermediate_size($file, $width, $height, $crop=false) {
 }
 
 function image_get_intermediate_size($post_id, $size='thumbnail') {
-	if ( !is_array( $imagedata = wp_get_attachment_metadata( $post_id ) ) )
+	if ( !$imagedata = wp_get_attachment_metadata( $post_id ) )
 		return false;
 
 	// get the best one for a specified set of dimensions
@@ -325,7 +325,7 @@ function wp_get_attachment_image_src($attachment_id, $size='thumbnail', $icon = 
 		return $image;
 
 	if ( $icon && $src = wp_mime_type_icon($attachment_id) ) {
-		$icon_dir = apply_filters( 'icon_dir', includes_url('images/crystal') );
+		$icon_dir = apply_filters( 'icon_dir', ABSPATH . WPINC . '/images/crystal' );
 		$src_file = $icon_dir . '/' . basename($src);
 		@list($width, $height) = getimagesize($src_file);
 	}
@@ -350,32 +350,6 @@ function wp_get_attachment_image($attachment_id, $size='thumbnail', $icon = fals
 	return $html;
 }
 
-add_shortcode('wp_caption', 'img_caption_shortcode');
-add_shortcode('caption', 'img_caption_shortcode');
-
-function img_caption_shortcode($attr, $content = null) {
-
-	// Allow plugins/themes to override the default caption template.
-	$output = apply_filters('img_caption_shortcode', '', $attr, $content);
-	if ( $output != '' )
-		return $output;
-
-	extract(shortcode_atts(array(
-		'id'	=> '',
-		'align'	=> 'alignnone',
-		'width'	=> '',
-		'caption' => ''
-	), $attr));
-	
-	if ( 1 > (int) $width || empty($caption) )
-		return $content;
-	
-	if ( $id ) $id = 'id="' . $id . '" ';
-	
-	return '<div ' . $id . 'class="wp-caption ' . $align . '" style="width: ' . (10 + (int) $width) . 'px">'
-	. $content . '<p class="wp-caption-text">' . $caption . '</p></div>';
-}
-
 add_shortcode('gallery', 'gallery_shortcode');
 
 function gallery_shortcode($attr) {
@@ -394,8 +368,7 @@ function gallery_shortcode($attr) {
 	}
 
 	extract(shortcode_atts(array(
-		'order'      => 'ASC',
-		'orderby'    => 'menu_order ID',
+		'orderby'    => 'menu_order ASC, ID ASC',
 		'id'         => $post->ID,
 		'itemtag'    => 'dl',
 		'icontag'    => 'dt',
@@ -405,7 +378,7 @@ function gallery_shortcode($attr) {
 	), $attr));
 
 	$id = intval($id);
-	$attachments = get_children( array('post_parent' => $id, 'post_status' => 'inherit', 'post_type' => 'attachment', 'post_mime_type' => 'image', 'order' => $order, 'orderby' => $orderby) );
+	$attachments = get_children("post_parent=$id&post_type=attachment&post_mime_type=image&orderby={$orderby}");
 
 	if ( empty($attachments) )
 		return '';
@@ -479,7 +452,7 @@ function next_image_link() {
 function adjacent_image_link($prev = true) {
 	global $post;
 	$post = get_post($post);
-	$attachments = array_values(get_children( array('post_parent' => $post->post_parent, 'post_status' => 'inherit', 'post_type' => 'attachment', 'post_mime_type' => 'image', 'order' => 'ASC', 'orderby' => 'menu_order ID') ));
+	$attachments = array_values(get_children("post_parent=$post->post_parent&post_type=attachment&post_mime_type=image&orderby=menu_order ASC, ID ASC"));
 
 	foreach ( $attachments as $k => $attachment )
 		if ( $attachment->ID == $post->ID )
