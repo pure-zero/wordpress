@@ -15,17 +15,24 @@
  * @uses WP_Filesystem_Base Extends class
  */
 class WP_Filesystem_Direct extends WP_Filesystem_Base {
-
+	var $errors = null;
 	/**
 	 * constructor
 	 *
-	 * @param mixed $arg ignored argument
+	 * @param mixed $arg ingored argument
 	 */
-	function __construct($arg) {
+	function WP_Filesystem_Direct($arg) {
 		$this->method = 'direct';
 		$this->errors = new WP_Error();
 	}
-
+	/**
+	 * connect filesystem.
+	 *
+	 * @return bool Returns true on success or false on failure (always true for WP_Filesystem_Direct).
+	 */
+	function connect() {
+		return true;
+	}
 	/**
 	 * Reads entire file into a string
 	 *
@@ -35,7 +42,6 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 	function get_contents($file) {
 		return @file_get_contents($file);
 	}
-
 	/**
 	 * Reads entire file into an array
 	 *
@@ -45,7 +51,6 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 	function get_contents_array($file) {
 		return @file($file);
 	}
-
 	/**
 	 * Write a string to a file
 	 *
@@ -54,29 +59,14 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 	 * @param int $mode (optional) The file permissions as octal number, usually 0644.
 	 * @return bool False upon failure.
 	 */
-	function put_contents( $file, $contents, $mode = false ) {
-		$fp = @fopen( $file, 'wb' );
-		if ( ! $fp )
+	function put_contents($file, $contents, $mode = false ) {
+		if ( ! ($fp = @fopen($file, 'w')) )
 			return false;
-
-		mbstring_binary_safe_encoding();
-
-		$data_length = strlen( $contents );
-
-		$bytes_written = fwrite( $fp, $contents );
-
-		reset_mbstring_encoding();
-
-		fclose( $fp );
-
-		if ( $data_length !== $bytes_written )
-			return false;
-
-		$this->chmod( $file, $mode );
-
+		@fwrite($fp, $contents);
+		@fclose($fp);
+		$this->chmod($file, $mode);
 		return true;
 	}
-
 	/**
 	 * Gets the current working directory
 	 *
@@ -85,7 +75,6 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 	function cwd() {
 		return @getcwd();
 	}
-
 	/**
 	 * Change directory
 	 *
@@ -95,13 +84,12 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 	function chdir($dir) {
 		return @chdir($dir);
 	}
-
 	/**
 	 * Changes file group
 	 *
 	 * @param string $file Path to the file.
 	 * @param mixed $group A group name or number.
-	 * @param bool $recursive (optional) If set True changes file group recursively. Defaults to False.
+	 * @param bool $recursive (optional) If set True changes file group recursivly. Defaults to False.
 	 * @return bool Returns true on success or false on failure.
 	 */
 	function chgrp($file, $group, $recursive = false) {
@@ -111,7 +99,7 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 			return @chgrp($file, $group);
 		if ( ! $this->is_dir($file) )
 			return @chgrp($file, $group);
-		// Is a directory, and we want recursive
+		//Is a directory, and we want recursive
 		$file = trailingslashit($file);
 		$filelist = $this->dirlist($file);
 		foreach ($filelist as $filename)
@@ -119,13 +107,12 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 
 		return true;
 	}
-
 	/**
 	 * Changes filesystem permissions
 	 *
 	 * @param string $file Path to the file.
 	 * @param int $mode (optional) The permissions as octal number, usually 0644 for files, 0755 for dirs.
-	 * @param bool $recursive (optional) If set True changes file group recursively. Defaults to False.
+	 * @param bool $recursive (optional) If set True changes file group recursivly. Defaults to False.
 	 * @return bool Returns true on success or false on failure.
 	 */
 	function chmod($file, $mode = false, $recursive = false) {
@@ -140,7 +127,7 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 
 		if ( ! $recursive || ! $this->is_dir($file) )
 			return @chmod($file, $mode);
-		// Is a directory, and we want recursive
+		//Is a directory, and we want recursive
 		$file = trailingslashit($file);
 		$filelist = $this->dirlist($file);
 		foreach ( (array)$filelist as $filename => $filemeta)
@@ -148,13 +135,12 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 
 		return true;
 	}
-
 	/**
 	 * Changes file owner
 	 *
 	 * @param string $file Path to the file.
 	 * @param mixed $owner A user name or number.
-	 * @param bool $recursive (optional) If set True changes file owner recursively. Defaults to False.
+	 * @param bool $recursive (optional) If set True changes file owner recursivly. Defaults to False.
 	 * @return bool Returns true on success or false on failure.
 	 */
 	function chown($file, $owner, $recursive = false) {
@@ -164,19 +150,18 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 			return @chown($file, $owner);
 		if ( ! $this->is_dir($file) )
 			return @chown($file, $owner);
-		// Is a directory, and we want recursive
+		//Is a directory, and we want recursive
 		$filelist = $this->dirlist($file);
 		foreach ($filelist as $filename) {
 			$this->chown($file . '/' . $filename, $owner, $recursive);
 		}
 		return true;
 	}
-
 	/**
 	 * Gets file owner
 	 *
 	 * @param string $file Path to the file.
-	 * @return string|bool Username of the user or false on error.
+	 * @return string Username of the user.
 	 */
 	function owner($file) {
 		$owneruid = @fileowner($file);
@@ -187,7 +172,6 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 		$ownerarray = posix_getpwuid($owneruid);
 		return $ownerarray['name'];
 	}
-
 	/**
 	 * Gets file permissions
 	 *
@@ -199,7 +183,6 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 	function getchmod($file) {
 		return substr(decoct(@fileperms($file)),3);
 	}
-
 	function group($file) {
 		$gid = @filegroup($file);
 		if ( ! $gid )
@@ -210,21 +193,18 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 		return $grouparray['name'];
 	}
 
-	function copy($source, $destination, $overwrite = false, $mode = false) {
+	function copy($source, $destination, $overwrite = false) {
 		if ( ! $overwrite && $this->exists($destination) )
 			return false;
 
-		$rtval = copy($source, $destination);
-		if ( $mode )
-			$this->chmod($destination, $mode);
-		return $rtval;
+		return copy($source, $destination);
 	}
 
 	function move($source, $destination, $overwrite = false) {
 		if ( ! $overwrite && $this->exists($destination) )
 			return false;
 
-		// try using rename first. if that fails (for example, source is read only) try copy
+		// try using rename first.  if that fails (for example, source is read only) try copy
 		if ( @rename($source, $destination) )
 			return true;
 
@@ -236,31 +216,28 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 		}
 	}
 
-	function delete($file, $recursive = false, $type = false) {
-		if ( empty( $file ) ) // Some filesystems report this as /, which can cause non-expected recursive deletion of all files in the filesystem.
+	function delete($file, $recursive = false) {
+		if ( empty($file) ) //Some filesystems report this as /, which can cause non-expected recursive deletion of all files in the filesystem.
 			return false;
-		$file = str_replace( '\\', '/', $file ); // for win32, occasional problems deleting files otherwise
+		$file = str_replace('\\', '/', $file); //for win32, occasional problems deleteing files otherwise
 
-		if ( 'f' == $type || $this->is_file($file) )
+		if ( $this->is_file($file) )
 			return @unlink($file);
 		if ( ! $recursive && $this->is_dir($file) )
 			return @rmdir($file);
 
-		// At this point it's a folder, and we're in recursive mode
+		//At this point its a folder, and we're in recursive mode
 		$file = trailingslashit($file);
 		$filelist = $this->dirlist($file, true);
 
 		$retval = true;
-		if ( is_array( $filelist ) ) {
-			foreach ( $filelist as $filename => $fileinfo ) {
-				if ( ! $this->delete($file . $filename, $recursive, $fileinfo['type']) )
+		if ( is_array($filelist) ) //false if no files, So check first.
+			foreach ($filelist as $filename => $fileinfo)
+				if ( ! $this->delete($file . $filename, $recursive) )
 					$retval = false;
-			}
-		}
 
 		if ( file_exists($file) && ! @rmdir($file) )
 			$retval = false;
-
 		return $retval;
 	}
 
@@ -291,7 +268,6 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 	function mtime($file) {
 		return @filemtime($file);
 	}
-
 	function size($file) {
 		return @filesize($file);
 	}
@@ -308,7 +284,7 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 		// safe mode fails with a trailing slash under certain PHP versions.
 		$path = untrailingslashit($path);
 		if ( empty($path) )
-			return false;
+			$path = '/';
 
 		if ( ! $chmod )
 			$chmod = FS_CHMOD_DIR;
@@ -382,3 +358,4 @@ class WP_Filesystem_Direct extends WP_Filesystem_Base {
 		return $ret;
 	}
 }
+?>
