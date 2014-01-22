@@ -1,11 +1,7 @@
 <?php
-/**
- * DotClear Importer
- *
- * @package WordPress
- * @subpackage Importer
- * @author Thomas Quinot
- * @link http://thomas.quinot.org/
+/*
+ * DotClear import plugin
+ * by Thomas Quinot - http://thomas.quinot.org/
  */
 
 /**
@@ -14,15 +10,6 @@
 
 if(!function_exists('get_comment_count'))
 {
-	/**
-	 * Get the comment count for posts.
-	 *
-	 * @package WordPress
-	 * @subpackage Dotclear_Import
-	 *
-	 * @param int $post_ID Post ID
-	 * @return int
-	 */
 	function get_comment_count($post_ID)
 	{
 		global $wpdb;
@@ -32,15 +19,6 @@ if(!function_exists('get_comment_count'))
 
 if(!function_exists('link_exists'))
 {
-	/**
-	 * Check whether link already exists.
-	 *
-	 * @package WordPress
-	 * @subpackage Dotclear_Import
-	 *
-	 * @param string $linkname
-	 * @return int
-	 */
 	function link_exists($linkname)
 	{
 		global $wpdb;
@@ -62,73 +40,31 @@ if(!function_exists('link_exists'))
 //    This cries out for a C-implementation to be included in PHP core
 //
 
-/**
- * @package WordPress
- * @subpackage Dotclear_Import
- *
- * @param string $char
- * @return string
- */
 function valid_1byte($char) {
 	if(!is_int($char)) return false;
 		return ($char & 0x80) == 0x00;
 }
 
-/**
- * @package WordPress
- * @subpackage Dotclear_Import
- *
- * @param string $char
- * @return string
- */
 function valid_2byte($char) {
 	if(!is_int($char)) return false;
 		return ($char & 0xE0) == 0xC0;
 }
 
-/**
- * @package WordPress
- * @subpackage Dotclear_Import
- *
- * @param string $char
- * @return string
- */
 function valid_3byte($char) {
 	if(!is_int($char)) return false;
 		return ($char & 0xF0) == 0xE0;
 }
 
-/**
- * @package WordPress
- * @subpackage Dotclear_Import
- *
- * @param string $char
- * @return string
- */
 function valid_4byte($char) {
 	if(!is_int($char)) return false;
 		return ($char & 0xF8) == 0xF0;
 }
 
-/**
- * @package WordPress
- * @subpackage Dotclear_Import
- *
- * @param string $char
- * @return string
- */
 function valid_nextbyte($char) {
 	if(!is_int($char)) return false;
 		return ($char & 0xC0) == 0x80;
 }
 
-/**
- * @package WordPress
- * @subpackage Dotclear_Import
- *
- * @param string $string
- * @return string
- */
 function valid_utf8($string) {
 	$len = strlen($string);
 	$i = 0;
@@ -156,13 +92,6 @@ function valid_utf8($string) {
 	return true; // done
 }
 
-/**
- * @package WordPress
- * @subpackage Dotclear_Import
- *
- * @param string $s
- * @return string
- */
 function csc ($s) {
 	if (valid_utf8 ($s)) {
 		return $s;
@@ -171,34 +100,18 @@ function csc ($s) {
 	}
 }
 
-/**
- * @package WordPress
- * @subpackage Dotclear_Import
- *
- * @param string $s
- * @return string
- */
 function textconv ($s) {
 	return csc (preg_replace ('|(?<!<br />)\s*\n|', ' ', $s));
 }
 
 /**
- * Dotclear Importer class
- *
- * Will process the WordPress eXtended RSS files that you upload from the export
- * file.
- *
- * @package WordPress
- * @subpackage Importer
- *
- * @since unknown
- */
+	The Main Importer Class
+**/
 class Dotclear_Import {
 
 	function header()
 	{
 		echo '<div class="wrap">';
-		screen_icon();
 		echo '<h2>'.__('Import DotClear').'</h2>';
 		echo '<p>'.__('Steps may take a few minutes depending on the size of your database. Please be patient.').'</p>';
 	}
@@ -215,7 +128,7 @@ class Dotclear_Import {
 		echo '<form action="admin.php?import=dotclear&amp;step=1" method="post">';
 		wp_nonce_field('import-dotclear');
 		$this->db_form();
-		echo '<p class="submit"><input type="submit" name="submit" class="button" value="'.attribute_escape(__('Import Categories')).'" /></p>';
+		echo '<p class="submit"><input type="submit" name="submit" value="'.attribute_escape(__('Import Categories')).'" /></p>';
 		echo '</form></div>';
 	}
 
@@ -632,7 +545,7 @@ class Dotclear_Import {
 
 		echo '<form action="admin.php?import=dotclear&amp;step=2" method="post">';
 		wp_nonce_field('import-dotclear');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Import Users')));
+		printf('<input type="submit" name="submit" value="%s" />', attribute_escape(__('Import Users')));
 		echo '</form>';
 
 	}
@@ -645,7 +558,7 @@ class Dotclear_Import {
 
 		echo '<form action="admin.php?import=dotclear&amp;step=3" method="post">';
 		wp_nonce_field('import-dotclear');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Import Posts')));
+		printf('<input type="submit" name="submit" value="%s" />', attribute_escape(__('Import Posts')));
 		echo '</form>';
 	}
 
@@ -659,7 +572,7 @@ class Dotclear_Import {
 
 		echo '<form action="admin.php?import=dotclear&amp;step=4" method="post">';
 		wp_nonce_field('import-dotclear');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Import Comments')));
+		printf('<input type="submit" name="submit" value="%s" />', attribute_escape(__('Import Comments')));
 		echo '</form>';
 	}
 
@@ -671,7 +584,7 @@ class Dotclear_Import {
 
 		echo '<form action="admin.php?import=dotclear&amp;step=5" method="post">';
 		wp_nonce_field('import-dotclear');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Import Links')));
+		printf('<input type="submit" name="submit" value="%s" />', attribute_escape(__('Import Links')));
 		echo '</form>';
 	}
 
@@ -684,7 +597,7 @@ class Dotclear_Import {
 
 		echo '<form action="admin.php?import=dotclear&amp;step=6" method="post">';
 		wp_nonce_field('import-dotclear');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Finish')));
+		printf('<input type="submit" name="submit" value="%s" />', attribute_escape(__('Finish')));
 		echo '</form>';
 	}
 
@@ -731,7 +644,7 @@ class Dotclear_Import {
 		printf('<tr><th><label for="dbuser">%s</label></th><td><input type="text" name="dbuser" id="dbuser" /></td></tr>', __('DotClear Database User:'));
 		printf('<tr><th><label for="dbpass">%s</label></th><td><input type="password" name="dbpass" id="dbpass" /></td></tr>', __('DotClear Database Password:'));
 		printf('<tr><th><label for="dbname">%s</label></th><td><input type="text" name="dbname" id="dbname" /></td></tr>', __('DotClear Database Name:'));
-		printf('<tr><th><label for="dbhost">%s</label></th><td><input type="text" name="dbhost" id="dbhost" value="localhost" /></td></tr>', __('DotClear Database Host:'));
+		printf('<tr><th><label for="dbhost">%s</label></th><td><input type="text" name="dbhost" nameid="dbhost" value="localhost" /></td></tr>', __('DotClear Database Host:'));
 		printf('<tr><th><label for="dbprefix">%s</label></th><td><input type="text" name="dbprefix" id="dbprefix" value="dc_"/></td></tr>', __('DotClear Table prefix:'));
 		printf('<tr><th><label for="dccharset">%s</label></th><td><input type="text" name="dccharset" id="dccharset" value="ISO-8859-15"/></td></tr>', __('Originating character set:'));
 		echo '</table>';
@@ -829,7 +742,5 @@ class Dotclear_Import {
 }
 
 $dc_import = new Dotclear_Import();
-
 register_importer('dotclear', __('DotClear'), __('Import categories, users, posts, comments, and links from a DotClear blog.'), array ($dc_import, 'dispatch'));
-
 ?>
