@@ -8,7 +8,7 @@
 /**
  * Schedules a hook to run only once.
  *
- * Schedules a hook which will be executed once by the WordPress actions core at
+ * Schedules a hook which will be executed once by the Wordpress actions core at
  * a time which you specify. The action will fire off when someone visits your
  * WordPress site, if the schedule time has passed.
  *
@@ -130,15 +130,10 @@ function wp_unschedule_event( $timestamp, $hook, $args = array() ) {
  * @since 2.1.0
  *
  * @param string $hook Action hook, the execution of which will be unscheduled.
- * @param array $args Optional. Arguments that were to be pass to the hook's callback function.
+ * @param mixed $args,... Optional. Event arguments.
  */
-function wp_clear_scheduled_hook( $hook, $args = array() ) {
-	// Backward compatibility
-	// Previously this function took the arguments as discrete vars rather than an array like the rest of the API
-	if ( !is_array($args) ) {
-		_deprecated_argument( __FUNCTION__, '3.0.0', __('This argument has changed to an array to match the behavior of the other cron functions.') );
-		$args = array_slice( func_get_args(), 1 );
-	}
+function wp_clear_scheduled_hook( $hook ) {
+	$args = array_slice( func_get_args(), 1 );
 
 	while ( $timestamp = wp_next_scheduled( $hook, $args ) )
 		wp_unschedule_event( $timestamp, $hook, $args );
@@ -224,7 +219,7 @@ function spawn_cron( $local_time = 0 ) {
 		while ( @ob_end_flush() );
 		flush();
 
-		WP_DEBUG ? include_once( ABSPATH . 'wp-cron.php' ) : @include_once( ABSPATH . 'wp-cron.php' );
+		@include_once(ABSPATH . 'wp-cron.php');
 		return;
 	}
 
@@ -398,3 +393,5 @@ function _upgrade_cron_array($cron) {
 function check_server_timer( $local_time ) {
 	return true;
 }
+
+?>

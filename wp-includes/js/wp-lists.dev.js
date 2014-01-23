@@ -3,7 +3,7 @@ var fs = {add:'ajaxAdd',del:'ajaxDel',dim:'ajaxDim',process:'process',recolor:'r
 
 wpList = {
 	settings: {
-		url: ajaxurl, type: 'POST',
+		url: wpListL10n.url, type: 'POST',
 		response: 'ajax-response',
 
 		what: '',
@@ -107,7 +107,6 @@ wpList = {
 				};
 			}
 			list.wpList.recolor();
-			$(list).trigger( 'wpListAddEnd', [ s, list.wpList ] );
 			wpList.clear.call(list,'#' + s.element);
 		};
 
@@ -117,12 +116,12 @@ wpList = {
 
 	ajaxDel: function( e, s ) {
 		e = $(e); s = s || {};
-		var list = this, cls = wpList.parseClass(e,'delete'), element;
+		var list = this, cls = wpList.parseClass(e,'delete'), element, anim;
 		s = wpList.pre.call( list, e, s, 'delete' );
 
 		s.element = cls[2] || s.element || null;
 		if ( cls[3] ) { s.delColor = '#' + cls[3]; }
-		else { s.delColor = s.delColor || '#faa'; }
+		else { s.delColor = s.delColor || '#FF3333'; }
 
 		if ( !s || !s.element ) { return false; }
 
@@ -136,7 +135,7 @@ wpList = {
 		);
 
 		if ( $.isFunction(s.delBefore) ) {
-			s = s.delBefore( s, list );
+			s = s.delBefore( s );
 			if ( !s ) { return true; }
 		}
 		if ( !s.data._ajax_nonce ) { return true; }
@@ -144,19 +143,20 @@ wpList = {
 		element = $('#' + s.element);
 
 		if ( 'none' != s.delColor ) {
-			element.css( 'backgroundColor', s.delColor ).fadeOut( 350, function(){
-				list.wpList.recolor();
-				$(list).trigger( 'wpListDelEnd', [ s, list.wpList ] );
-			});
+			anim = 'slideUp';
+			if ( element.css( 'display' ).match(/table/) )
+				anim = 'fadeOut'; // Can't slideup table rows and other table elements.  Known jQuery bug
+			element
+				.animate( { backgroundColor: s.delColor }, 'fast'  )[anim]( 'fast' )
+				.queue( function() { list.wpList.recolor(); $(this).dequeue(); } );
 		} else {
 			list.wpList.recolor();
-			$(list).trigger( 'wpListDelEnd', [ s, list.wpList ] );
 		}
 
 		s.success = function(r) {
 			var res = wpAjax.parseAjaxResponse(r, s.response, s.element), o;
 			if ( !res || res.errors ) {
-				element.stop().stop().css( 'backgroundColor', '#faa' ).show().queue( function() { list.wpList.recolor(); $(this).dequeue(); } );
+				element.stop().stop().css( 'backgroundColor', '#FF3333' ).show().queue( function() { list.wpList.recolor(); $(this).dequeue(); } );
 				return false;
 			}
 			if ( $.isFunction(s.delAfter) ) {
@@ -213,9 +213,7 @@ wpList = {
 			element
 				.animate( { backgroundColor: dimColor }, 'fast' )
 				.queue( function() { element.toggleClass(s.dimClass); $(this).dequeue(); } )
-				.animate( { backgroundColor: color }, { complete: function() { $(this).css( 'backgroundColor', '' ); $(list).trigger( 'wpListDimEnd', [ s, list.wpList ] ); } } );
-		} else {
-			$(list).trigger( 'wpListDimEnd', [ s, list.wpList ] );
+				.animate( { backgroundColor: color }, { complete: function() { $(this).css( 'backgroundColor', '' ); } } );
 		}
 
 		if ( !s.data._ajax_nonce ) { return true; }
