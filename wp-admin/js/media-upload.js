@@ -1,18 +1,13 @@
 // send html to the post editor
 function send_to_editor(h) {
-	if ( typeof tinyMCE != 'undefined' && ( ed = tinyMCE.activeEditor ) && !ed.isHidden() ) {
-		ed.focus();
-		if (tinymce.isIE)
-			ed.selection.moveToBookmark(tinymce.EditorManager.activeEditor.windowManager.bookmark);
+	var win = window.dialogArguments || opener || parent || top;
 
-		if ( h.indexOf('[caption') != -1 )
-			h = ed.plugins.wpeditimage._do_shcode(h);
-		
-		ed.execCommand('mceInsertContent', false, h);
+	tinyMCE = win.tinyMCE;
+	if ( typeof tinyMCE != 'undefined' && ( ed = tinyMCE.getInstanceById('content') ) && !ed.isHidden() ) {
+		tinyMCE.selectedInstance.getWin().focus();
+		tinyMCE.execCommand('mceInsertContent', false, h);
 	} else
-		edInsertContent(edCanvas, h);
-
-	tb_remove();
+		win.edInsertContent(win.edCanvas, h);
 }
 
 // thickbox settings
@@ -26,10 +21,7 @@ jQuery(function($) {
 		if ( tbWindow.size() ) {
 			tbWindow.width( W - 50 ).height( H - 45 );
 			$('#TB_iframeContent').width( W - 50 ).height( H - 75 );
-			tbWindow.css({'margin-left': '-' + parseInt((( W - 50 ) / 2),10) + 'px'});
-			if ( typeof document.body.style.maxWidth != 'undefined' )
-				tbWindow.css({'top':'20px','margin-top':'0'});
-			$('#TB_title').css({'background-color':'#222','color':'#cfcfcf'});
+			tbWindow.css({marginLeft: '-' + parseInt((( W - 50 ) / 2),10) + 'px'});
 		};
 
 		return $('a.thickbox').each( function() {
@@ -40,14 +32,8 @@ jQuery(function($) {
 			$(this).attr( 'href', href + '&width=' + ( W - 80 ) + '&height=' + ( H - 85 ) );
 		});
 	};
-	
-	jQuery('a.thickbox').click(function(){
-		if ( typeof tinyMCE != 'undefined' &&  tinyMCE.activeEditor ) {
-			tinyMCE.get('content').focus();
-			tinyMCE.activeEditor.windowManager.bookmark = tinyMCE.activeEditor.selection.getBookmark('simple');
-		}
-	});
 
 	$(window).resize( function() { tb_position() } );
+	$(document).ready( function() { tb_position() } );
 });
 
