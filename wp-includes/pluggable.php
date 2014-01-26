@@ -539,9 +539,6 @@ function wp_validate_auth_cookie($cookie = '', $scheme = '') {
 		return false;
 	}
 
-	if ( $expiration < time() ) // AJAX/POST grace period set above
-		$GLOBALS['login_grace_period'] = 1;
-
 	do_action('auth_cookie_valid', $cookie_elements, $user);
 
 	return $user->ID;
@@ -753,7 +750,7 @@ function auth_redirect() {
 		}
 	}
 
-	if ( $user_id = wp_validate_auth_cookie( '', apply_filters( 'auth_redirect_scheme', '' ) ) ) {
+	if ( $user_id = wp_validate_auth_cookie() ) {
 		do_action('auth_redirect', $user_id);
 
 		// If the user wants ssl but the session is not ssl, redirect.
@@ -824,7 +821,7 @@ function check_ajax_referer( $action = -1, $query_arg = false, $die = true ) {
 	if ( $query_arg )
 		$nonce = $_REQUEST[$query_arg];
 	else
-		$nonce = isset($_REQUEST['_ajax_nonce']) ? $_REQUEST['_ajax_nonce'] : $_REQUEST['_wpnonce'];
+		$nonce = $_REQUEST['_ajax_nonce'] ? $_REQUEST['_ajax_nonce'] : $_REQUEST['_wpnonce'];
 
 	$result = wp_verify_nonce( $nonce, $action );
 
@@ -865,7 +862,7 @@ function wp_redirect($location, $status = 302) {
 	} else {
 		if ( php_sapi_name() != 'cgi-fcgi' )
 			status_header($status); // This causes problems on IIS and some FastCGI setups
-		header("Location: $location", true, $status);
+		header("Location: $location");
 	}
 }
 endif;
@@ -976,10 +973,8 @@ function wp_notify_postauthor($comment_id, $comment_type='') {
 	if ('' == $user->user_email) return false; // If there's no email to send the comment to
 
 	$comment_author_domain = @gethostbyaddr($comment->comment_author_IP);
-	
-	// The blogname option is escaped with esc_html on the way into the database in sanitize_option
-	// we want to reverse this for the plain text arena of emails.
-	$blogname = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
+
+	$blogname = get_option('blogname');
 
 	if ( empty( $comment_type ) ) $comment_type = 'comment';
 
@@ -1003,7 +998,7 @@ function wp_notify_postauthor($comment_id, $comment_type='') {
 		$notify_message .= sprintf( __('URL    : %s'), $comment->comment_author_url ) . "\r\n";
 		$notify_message .= __('Excerpt: ') . "\r\n" . $comment->comment_content . "\r\n\r\n";
 		$notify_message .= __('You can see all trackbacks on this post here: ') . "\r\n";
-		/* translators: 1: blog name, 2: post title */
+		/* translators: 1: blog name, 2: post title */		
 		$subject = sprintf( __('[%1$s] Trackback: "%2$s"'), $blogname, $post->post_title );
 	} elseif ('pingback' == $comment_type) {
 		/* translators: 1: post id, 2: post title */
@@ -1017,11 +1012,8 @@ function wp_notify_postauthor($comment_id, $comment_type='') {
 		$subject = sprintf( __('[%1$s] Pingback: "%2$s"'), $blogname, $post->post_title );
 	}
 	$notify_message .= get_permalink($comment->comment_post_ID) . "#comments\r\n\r\n";
-	if ( EMPTY_TRASH_DAYS )
-		$notify_message .= sprintf( __('Trash it: %s'), admin_url("comment.php?action=trash&c=$comment_id") ) . "\r\n";
-	else
-		$notify_message .= sprintf( __('Delete it: %s'), admin_url("comment.php?action=delete&c=$comment_id") ) . "\r\n";
-	$notify_message .= sprintf( __('Spam it: %s'), admin_url("comment.php?action=spam&c=$comment_id") ) . "\r\n";
+	$notify_message .= sprintf( __('Delete it: %s'), admin_url("comment.php?action=cdc&c=$comment_id") ) . "\r\n";
+	$notify_message .= sprintf( __('Spam it: %s'), admin_url("comment.php?action=cdc&dt=spam&c=$comment_id") ) . "\r\n";
 
 	$wp_email = 'wordpress@' . preg_replace('#^www\.#', '', strtolower($_SERVER['SERVER_NAME']));
 
@@ -1072,11 +1064,7 @@ function wp_notify_moderator($comment_id) {
 
 	$comment_author_domain = @gethostbyaddr($comment->comment_author_IP);
 	$comments_waiting = $wpdb->get_var("SELECT count(comment_ID) FROM $wpdb->comments WHERE comment_approved = '0'");
-	
-	// The blogname option is escaped with esc_html on the way into the database in sanitize_option
-	// we want to reverse this for the plain text arena of emails.
-	$blogname = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
-	
+
 	switch ($comment->comment_type)
 	{
 		case 'trackback':
@@ -1104,18 +1092,15 @@ function wp_notify_moderator($comment_id) {
 			break;
 	}
 
-	$notify_message .= sprintf( __('Approve it: %s'),  admin_url("comment.php?action=approve&c=$comment_id") ) . "\r\n";
-	if ( EMPTY_TRASH_DAYS )
-		$notify_message .= sprintf( __('Trash it: %s'), admin_url("comment.php?action=trash&c=$comment_id") ) . "\r\n";
-	else
-		$notify_message .= sprintf( __('Delete it: %s'), admin_url("comment.php?action=delete&c=$comment_id") ) . "\r\n";
-	$notify_message .= sprintf( __('Spam it: %s'), admin_url("comment.php?action=spam&c=$comment_id") ) . "\r\n";
+	$notify_message .= sprintf( __('Approve it: %s'),  admin_url("comment.php?action=mac&c=$comment_id") ) . "\r\n";
+	$notify_message .= sprintf( __('Delete it: %s'), admin_url("comment.php?action=cdc&c=$comment_id") ) . "\r\n";
+	$notify_message .= sprintf( __('Spam it: %s'), admin_url("comment.php?action=cdc&dt=spam&c=$comment_id") ) . "\r\n";
 
 	$notify_message .= sprintf( _n('Currently %s comment is waiting for approval. Please visit the moderation panel:',
  		'Currently %s comments are waiting for approval. Please visit the moderation panel:', $comments_waiting), number_format_i18n($comments_waiting) ) . "\r\n";
 	$notify_message .= admin_url("edit-comments.php?comment_status=moderated") . "\r\n";
 
-	$subject = sprintf( __('[%1$s] Please moderate: "%2$s"'), $blogname, $post->post_title );
+	$subject = sprintf( __('[%1$s] Please moderate: "%2$s"'), get_option('blogname'), $post->post_title );
 	$admin_email = get_option('admin_email');
 	$message_headers = '';
 
@@ -1142,10 +1127,7 @@ function wp_password_change_notification(&$user) {
 	// but check to see if it's the admin whose password we're changing, and skip this
 	if ( $user->user_email != get_option('admin_email') ) {
 		$message = sprintf(__('Password Lost and Changed for user: %s'), $user->user_login) . "\r\n";
-		// The blogname option is escaped with esc_html on the way into the database in sanitize_option
-		// we want to reverse this for the plain text arena of emails.
-		$blogname = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
-		wp_mail(get_option('admin_email'), sprintf(__('[%s] Password Lost/Changed'), $blogname), $message);
+		wp_mail(get_option('admin_email'), sprintf(__('[%s] Password Lost/Changed'), get_option('blogname')), $message);
 	}
 }
 endif;
@@ -1164,16 +1146,12 @@ function wp_new_user_notification($user_id, $plaintext_pass = '') {
 
 	$user_login = stripslashes($user->user_login);
 	$user_email = stripslashes($user->user_email);
-	
-	// The blogname option is escaped with esc_html on the way into the database in sanitize_option
-	// we want to reverse this for the plain text arena of emails.
-	$blogname = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
 
-	$message  = sprintf(__('New user registration on your blog %s:'), $blogname) . "\r\n\r\n";
+	$message  = sprintf(__('New user registration on your blog %s:'), get_option('blogname')) . "\r\n\r\n";
 	$message .= sprintf(__('Username: %s'), $user_login) . "\r\n\r\n";
 	$message .= sprintf(__('E-mail: %s'), $user_email) . "\r\n";
 
-	@wp_mail(get_option('admin_email'), sprintf(__('[%s] New User Registration'), $blogname), $message);
+	@wp_mail(get_option('admin_email'), sprintf(__('[%s] New User Registration'), get_option('blogname')), $message);
 
 	if ( empty($plaintext_pass) )
 		return;
@@ -1182,7 +1160,7 @@ function wp_new_user_notification($user_id, $plaintext_pass = '') {
 	$message .= sprintf(__('Password: %s'), $plaintext_pass) . "\r\n";
 	$message .= wp_login_url() . "\r\n";
 
-	wp_mail($user_email, sprintf(__('[%s] Your username and password'), $blogname), $message);
+	wp_mail($user_email, sprintf(__('[%s] Your username and password'), get_option('blogname')), $message);
 
 }
 endif;
@@ -1789,3 +1767,4 @@ function wp_text_diff( $left_string, $right_string, $args = null ) {
 }
 endif;
 
+?>
