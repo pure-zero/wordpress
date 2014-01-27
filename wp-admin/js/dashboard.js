@@ -1,117 +1,52 @@
-var ajaxWidgets, ajaxPopulateWidgets, quickPressLoad;
 
-jQuery(document).ready( function($) {
-	/* Dashboard Welcome Panel */
-	var welcomePanel = $('#welcome-panel'),
-		welcomePanelHide = $('#wp_welcome_panel-hide'),
-	 	updateWelcomePanel = function( visible ) {
-			$.post( ajaxurl, {
-				action: 'update-welcome-panel',
-				visible: visible,
-				welcomepanelnonce: $('#welcomepanelnonce').val()
-			});
-		};
+jQuery( function($) {
 
-	if ( welcomePanel.hasClass('hidden') && welcomePanelHide.prop('checked') )
-		welcomePanel.removeClass('hidden');
+// close postboxes that should be closed
+jQuery('.if-js-closed').removeClass('if-js-closed').addClass('closed');
 
-	$('.welcome-panel-close, .welcome-panel-dismiss a', welcomePanel).click( function(e) {
-		e.preventDefault();
-		welcomePanel.addClass('hidden');
-		updateWelcomePanel( 0 );
-		$('#wp_welcome_panel-hide').prop('checked', false);
-	});
+// These widgets are sometimes populated via ajax
+var ajaxWidgets = [
+	'dashboard_incoming_links',
+	'dashboard_primary',
+	'dashboard_secondary',
+	'dashboard_plugins'
+];
 
-	welcomePanelHide.click( function() {
-		welcomePanel.toggleClass('hidden', ! this.checked );
-		updateWelcomePanel( this.checked ? 1 : 0 );
-	});
+var ajaxPopulateWidgets = function() {
+	$.each( ajaxWidgets, function() {
+		var e = jQuery('#' + this + ':visible div.inside').find('.widget-loading');
+		if ( e.size() ) { e.parent().load('index-extra.php?jax=' + this); }
+	} );
+};
+ajaxPopulateWidgets();
 
-	// These widgets are sometimes populated via ajax
-	ajaxWidgets = [
-		'dashboard_incoming_links',
-		'dashboard_primary',
-		'dashboard_secondary',
-		'dashboard_plugins'
-	];
+postboxes.add_postbox_toggles('dashboard', { onShow: ajaxPopulateWidgets } );
 
-	ajaxPopulateWidgets = function(el) {
-		function show(i, id) {
-			var p, e = $('#' + id + ' div.inside:visible').find('.widget-loading');
-			if ( e.length ) {
-				p = e.parent();
-				setTimeout( function(){
-					p.load( ajaxurl + '?action=dashboard-widgets&widget=' + id, '', function() {
-						p.hide().slideDown('normal', function(){
-							$(this).css('display', '');
-						});
-					});
-				}, i * 500 );
-			}
+/* QuickPress */
+var quickPressLoad = function() {
+	var act = $('#quickpost-action');
+	var t = $('#quick-press').submit( function() {
+		$('#dashboard_quick_press h3').append( '<img src="images/loading.gif" style="margin: 0 6px 0 0; vertical-align: middle" />' );
+
+		if ( 'post' == act.val() ) {
+			act.val( 'post-quickpress-publish' );
 		}
 
-		if ( el ) {
-			el = el.toString();
-			if ( $.inArray(el, ajaxWidgets) != -1 )
-				show(0, el);
-		} else {
-			$.each( ajaxWidgets, show );
-		}
-	};
-	ajaxPopulateWidgets();
-
-	postboxes.add_postbox_toggles(pagenow, { pbshow: ajaxPopulateWidgets } );
-
-	/* QuickPress */
-	quickPressLoad = function() {
-		var act = $('#quickpost-action'), t;
-		t = $('#quick-press').submit( function() {
-			$('#dashboard_quick_press #publishing-action .spinner').show();
-			$('#quick-press .submit input[type="submit"], #quick-press .submit input[type="reset"]').prop('disabled', true);
-
-			if ( 'post' == act.val() ) {
-				act.val( 'post-quickpress-publish' );
-			}
-
-			$('#dashboard_quick_press div.inside').load( t.attr( 'action' ), t.serializeArray(), function() {
-				$('#dashboard_quick_press #publishing-action .spinner').hide();
-				$('#quick-press .submit input[type="submit"], #quick-press .submit input[type="reset"]').prop('disabled', false);
-				$('#dashboard_quick_press ul').next('p').remove();
-				$('#dashboard_quick_press ul').find('li').each( function() {
-					$('#dashboard_recent_drafts ul').prepend( this );
-				} ).end().remove();
-				quickPressLoad();
-			} );
-			return false;
+		$('#dashboard_quick_press div.inside').load( t.attr( 'action' ), t.serializeArray(), function() {
+			$('#dashboard_quick_press h3 img').remove();
+			$('#dashboard_quick_press ul').find('li').each( function() {
+				$('#dashboard_recent_drafts ul').prepend( this );
+			} ).end().remove();
+			$(this).find('.hide-if-no-js').removeClass('hide-if-no-js');
+			tb_init('a.thickbox');
+			quickPressLoad();
 		} );
+		return false;
+	} );
 
-		$('#publish').click( function() { act.val( 'post-quickpress-publish' ); } );
+	$('#publish').click( function() { act.val( 'post-quickpress-publish' ); } );
 
-		$('#title, #tags-input').each( function() {
-			var input = $(this), prompt = $('#' + this.id + '-prompt-text');
-
-			if ( '' === this.value )
-				prompt.removeClass('screen-reader-text');
-
-			prompt.click( function() {
-				$(this).addClass('screen-reader-text');
-				input.focus();
-			});
-
-			input.blur( function() {
-				if ( '' === this.value )
-					prompt.removeClass('screen-reader-text');
-			});
-
-			input.focus( function() {
-				prompt.addClass('screen-reader-text');
-			});
-		});
-
-		$('#quick-press').on( 'click focusin', function() {
-			wpActiveEditor = 'content';
-		});
-	};
-	quickPressLoad();
+};
+quickPressLoad();
 
 } );

@@ -1,33 +1,32 @@
-(function($,undefined) {
+// Word count
+(function(JQ) {
 	wpWordCount = {
 
-		settings : {
-			strip : /<[a-zA-Z\/][^<>]*>/g, // strip HTML tags
-			clean : /[0-9.(),;:!?%#$¿'"_+=\\/-]+/g, // regexp to remove punctuation, etc.
-			w : /\S\s+/g, // word-counting regexp
-			c : /\S/g // char-counting regexp for asian languages
+		init : function() {
+			var t = this, last = 0, co = JQ('#content');
+
+			JQ('#wp-word-count').html( wordCountL10n.count.replace( /%d/, '<span id="word-count">0</span>' ) );
+			t.block = 0;
+			t.wc(co.val());
+			co.keyup( function(e) {
+				if ( e.keyCode == last ) return true;
+				if ( 13 == e.keyCode || 8 == last || 46 == last ) t.wc(co.val());
+				last = e.keyCode;
+				return true;
+			});
 		},
 
-		block : 0,
+		wc : function(tx) {
+			var t = this, w = JQ('#word-count'), tc = 0;
 
-		wc : function(tx, type) {
-			var t = this, w = $('.word-count'), tc = 0;
-
-			if ( type === undefined )
-				type = wordCountL10n.type;
-			if ( type !== 'w' && type !== 'c' )
-				type = 'w';
-
-			if ( t.block )
-				return;
-
+			if ( t.block ) return;
 			t.block = 1;
 
 			setTimeout( function() {
 				if ( tx ) {
-					tx = tx.replace( t.settings.strip, ' ' ).replace( /&nbsp;|&#160;/gi, ' ' );
-					tx = tx.replace( t.settings.clean, '' );
-					tx.replace( t.settings[type], function(){tc++;} );
+					tx = tx.replace( /<.[^<>]*?>/g, ' ' ).replace( /&nbsp;/gi, ' ' );
+					tx = tx.replace( /[0-9.(),;:!?%#$¿'"_+=\\/-]*/g, '' );
+					tx.replace( /\S\s+/g, function(){tc++;} );
 				}
 				w.html(tc.toString());
 
@@ -35,8 +34,6 @@
 			}, 1 );
 		}
 	}
-
-	$(document).bind( 'wpcountwords', function(e, txt) {
-		wpWordCount.wc(txt);
-	});
 }(jQuery));
+
+jQuery(document).ready( function(){ wpWordCount.init(); } );

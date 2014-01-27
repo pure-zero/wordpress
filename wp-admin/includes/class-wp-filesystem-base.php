@@ -13,7 +13,7 @@
  */
 class WP_Filesystem_Base {
 	/**
-	 * Whether to display debug data for the connection.
+	 * Whether to display debug data for the connection or not.
 	 *
 	 * @since 2.5
 	 * @access public
@@ -21,7 +21,7 @@ class WP_Filesystem_Base {
 	 */
 	var $verbose = false;
 	/**
-	 * Cached list of local filepaths to mapped remote filepaths.
+	 * Cached list of local filepaths to maped remote filepaths.
 	 *
 	 * @since 2.7
 	 * @access private
@@ -46,6 +46,8 @@ class WP_Filesystem_Base {
 	 * @return string The location of the remote path.
 	 */
 	function abspath() {
+		if ( defined('FTP_BASE') && strpos($this->method, 'ftp') !== false )
+			return FTP_BASE;
 		$folder = $this->find_folder(ABSPATH);
 		//Perhaps the FTP folder is rooted at the WordPress install, Check for wp-includes folder in root, Could have some false positives, but rare.
 		if ( ! $folder && $this->is_dir('/wp-includes') )
@@ -60,6 +62,8 @@ class WP_Filesystem_Base {
 	 * @return string The location of the remote path.
 	 */
 	function wp_content_dir() {
+		if ( defined('FTP_CONTENT_DIR') && strpos($this->method, 'ftp') !== false )
+			return FTP_CONTENT_DIR;
 		return $this->find_folder(WP_CONTENT_DIR);
 	}
 	/**
@@ -71,6 +75,8 @@ class WP_Filesystem_Base {
 	 * @return string The location of the remote path.
 	 */
 	function wp_plugins_dir() {
+		if ( defined('FTP_PLUGIN_DIR') && strpos($this->method, 'ftp') !== false )
+			return FTP_PLUGIN_DIR;
 		return $this->find_folder(WP_PLUGIN_DIR);
 	}
 	/**
@@ -82,18 +88,7 @@ class WP_Filesystem_Base {
 	 * @return string The location of the remote path.
 	 */
 	function wp_themes_dir() {
-		return $this->wp_content_dir() . 'themes/';
-	}
-	/**
-	 * Returns the path on the remote filesystem of WP_LANG_DIR
-	 *
-	 * @since 3.2.0
-	 * @access public
-	 *
-	 * @return string The location of the remote path.
-	 */
-	function wp_lang_dir() {
-		return $this->find_folder(WP_LANG_DIR);
+		return $this->wp_content_dir() . '/themes';
 	}
 
 	/**
@@ -147,28 +142,17 @@ class WP_Filesystem_Base {
 	 */
 	function find_folder($folder) {
 
-		if ( strpos($this->method, 'ftp') !== false ) {
-			$constant_overrides = array( 'FTP_BASE' => ABSPATH, 'FTP_CONTENT_DIR' => WP_CONTENT_DIR, 'FTP_PLUGIN_DIR' => WP_PLUGIN_DIR, 'FTP_LANG_DIR' => WP_LANG_DIR );
-			foreach ( $constant_overrides as $constant => $dir )
-				if ( defined($constant) && $folder === $dir )
-					return trailingslashit(constant($constant));
-		} elseif ( 'direct' == $this->method ) {
-			$folder = str_replace('\\', '/', $folder); //Windows path sanitisation
-			return trailingslashit($folder);
-		}
-
-		$folder = preg_replace('|^([a-z]{1}):|i', '', $folder); //Strip out windows drive letter if it's there.
-		$folder = str_replace('\\', '/', $folder); //Windows path sanitisation
+		$folder = preg_replace('|^([a-z]{1}):|i', '', $folder); //Strip out windows driveletter if its there.
+		$folder = str_replace('\\', '/', $folder); //Windows path sanitiation
 
 		if ( isset($this->cache[ $folder ] ) )
 			return $this->cache[ $folder ];
 
 		if ( $this->exists($folder) ) { //Folder exists at that absolute path.
-			$folder = trailingslashit($folder);
 			$this->cache[ $folder ] = $folder;
 			return $folder;
 		}
-		if ( $return = $this->search_for_folder($folder) )
+		if( $return = $this->search_for_folder($folder) )
 			$this->cache[ $folder ] = $return;
 		return $return;
 	}
@@ -193,40 +177,37 @@ class WP_Filesystem_Base {
 		$folder = untrailingslashit($folder);
 
 		$folder_parts = explode('/', $folder);
-		$last_index = array_pop( array_keys( $folder_parts ) );
-		$last_path = $folder_parts[ $last_index ];
+		$last_path = $folder_parts[ count($folder_parts) - 1 ];
 
 		$files = $this->dirlist( $base );
 
-		foreach ( $folder_parts as $index => $key ) {
-			if ( $index == $last_index )
+		foreach ( $folder_parts as $key ) {
+			if ( $key == $last_path )
 				continue; //We want this to be caught by the next code block.
 
 			//Working from /home/ to /user/ to /wordpress/ see if that file exists within the current folder,
 			// If its found, change into it and follow through looking for it.
 			// If it cant find WordPress down that route, it'll continue onto the next folder level, and see if that matches, and so on.
 			// If it reaches the end, and still cant find it, it'll return false for the entire function.
-			if ( isset($files[ $key ]) ){
+			if( isset($files[ $key ]) ){
 				//Lets try that folder:
 				$newdir = trailingslashit(path_join($base, $key));
-				if ( $this->verbose )
+				if( $this->verbose )
 					printf( __('Changing to %s') . '<br/>', $newdir );
-				// only search for the remaining path tokens in the directory, not the full path again
-				$newfolder = implode( '/', array_slice( $folder_parts, $index + 1 ) );
-				if ( $ret = $this->search_for_folder( $newfolder, $newdir, $loop) )
+				if( $ret = $this->search_for_folder( $folder, $newdir, $loop) )
 					return $ret;
 			}
 		}
 
-		//Only check this as a last resort, to prevent locating the incorrect install. All above procedures will fail quickly if this is the right branch to take.
-		if (isset( $files[ $last_path ] ) ) {
-			if ( $this->verbose )
+		//Only check this as a last resort, to prevent locating the incorrect install. All above proceeedures will fail quickly if this is the right branch to take.
+		if(isset( $files[ $last_path ] ) ) {
+			if( $this->verbose )
 				printf( __('Found %s') . '<br/>',  $base . $last_path );
-			return trailingslashit($base . $last_path);
+			return $base . $last_path;
 		}
-		if ( $loop )
-			return false; //Prevent this function from looping again.
-		//As an extra last resort, Change back to / if the folder wasn't found. This comes into effect when the CWD is /home/user/ but WP is at /var/www/.... mainly dedicated setups.
+		if( $loop )
+			return false;//Prevent tihs function looping again.
+		//As an extra last resort, Change back to / if the folder wasnt found. This comes into effect when the CWD is /home/user/ but WP is at /var/www/.... mainly dedicated setups.
 		return $this->search_for_folder($folder, '/', true);
 
 	}
@@ -257,7 +238,7 @@ class WP_Filesystem_Base {
 			$info = 'd';
 		elseif (($perms & 0x2000) == 0x2000) // Character special
 			$info = 'c';
-		elseif (($perms & 0x1000) == 0x1000) // FIFO pipe
+		elseif (($perms & 0x1000) == 0x1000)// FIFO pipe
 			$info = 'p';
 		else // Unknown
 			$info = 'u';
@@ -303,18 +284,18 @@ class WP_Filesystem_Base {
 		$legal =  array('', 'w', 'r', 'x', '-');
 		$attarray = preg_split('//', $mode);
 
-		for ($i=0; $i < count($attarray); $i++)
-		   if ($key = array_search($attarray[$i], $legal))
+		for($i=0; $i < count($attarray); $i++)
+		   if($key = array_search($attarray[$i], $legal))
 			   $realmode .= $legal[$key];
 
-		$mode = str_pad($realmode, 10, '-', STR_PAD_LEFT);
+		$mode = str_pad($realmode, 9, '-');
 		$trans = array('-'=>'0', 'r'=>'4', 'w'=>'2', 'x'=>'1');
 		$mode = strtr($mode,$trans);
 
-		$newmode = $mode[0];
-		$newmode .= $mode[1] + $mode[2] + $mode[3];
-		$newmode .= $mode[4] + $mode[5] + $mode[6];
-		$newmode .= $mode[7] + $mode[8] + $mode[9];
+		$newmode = '';
+		$newmode .= $mode[0] + $mode[1] + $mode[2];
+		$newmode .= $mode[3] + $mode[4] + $mode[5];
+		$newmode .= $mode[6] + $mode[7] + $mode[8];
 		return $newmode;
 	}
 
@@ -331,3 +312,5 @@ class WP_Filesystem_Base {
 		return (bool) preg_match('|[^\x20-\x7E]|', $text); //chr(32)..chr(127)
 	}
 }
+
+?>

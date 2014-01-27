@@ -1,11 +1,5 @@
 <?php
-
-/**
- * Deprecated. Use WP_HTTP (http.php, class-http.php) instead.
- */
-_deprecated_file( basename( __FILE__ ), '3.0', WPINC . '/http.php' );
-
-if ( !class_exists( 'Snoopy' ) ) :
+if ( !in_array('Snoopy', get_declared_classes() ) ) :
 /*************************************************
 
 Snoopy - the PHP net client
@@ -719,13 +713,13 @@ class Snoopy
 							chr(176),
 							chr(39),
 							chr(128),
-							chr(0xE4), // ANSI &auml;
-							chr(0xF6), // ANSI &ouml;
-							chr(0xFC), // ANSI &uuml;
-							chr(0xC4), // ANSI &Auml;
-							chr(0xD6), // ANSI &Ouml;
-							chr(0xDC), // ANSI &Uuml;
-							chr(0xDF), // ANSI &szlig;
+							"ä",
+							"ö",
+							"ü",
+							"Ä",
+							"Ö",
+							"Ü",
+							"ß",
 						);
 
 		$text = preg_replace($search,$replace,$document);

@@ -148,7 +148,7 @@ function do_shortcode($content) {
 		return $content;
 
 	$pattern = get_shortcode_regex();
-	return preg_replace_callback( "/$pattern/s", 'do_shortcode_tag', $content );
+	return preg_replace_callback('/'.$pattern.'/s', 'do_shortcode_tag', $content);
 }
 
 /**
@@ -156,15 +156,6 @@ function do_shortcode($content) {
  *
  * The regular expression combines the shortcode tags in the regular expression
  * in a regex class.
- *
- * The regular expression contains 6 different sub matches to help with parsing.
- *
- * 1 - An extra [ to allow for escaping shortcodes with double [[]]
- * 2 - The shortcode name
- * 3 - The shortcode argument list
- * 4 - The self closing /
- * 5 - The content of a shortcode when it wraps some content.
- * 6 - An extra ] to allow for escaping shortcodes with double [[]]
  *
  * @since 2.5
  * @uses $shortcode_tags
@@ -176,42 +167,11 @@ function get_shortcode_regex() {
 	$tagnames = array_keys($shortcode_tags);
 	$tagregexp = join( '|', array_map('preg_quote', $tagnames) );
 
-	// WARNING! Do not change this regex without changing do_shortcode_tag() and strip_shortcode_tag()
-	// Also, see shortcode_unautop() and shortcode.js.
-	return
-		  '\\['                              // Opening bracket
-		. '(\\[?)'                           // 1: Optional second opening bracket for escaping shortcodes: [[tag]]
-		. "($tagregexp)"                     // 2: Shortcode name
-		. '(?![\\w-])'                       // Not followed by word character or hyphen
-		. '('                                // 3: Unroll the loop: Inside the opening shortcode tag
-		.     '[^\\]\\/]*'                   // Not a closing bracket or forward slash
-		.     '(?:'
-		.         '\\/(?!\\])'               // A forward slash not followed by a closing bracket
-		.         '[^\\]\\/]*'               // Not a closing bracket or forward slash
-		.     ')*?'
-		. ')'
-		. '(?:'
-		.     '(\\/)'                        // 4: Self closing tag ...
-		.     '\\]'                          // ... and closing bracket
-		. '|'
-		.     '\\]'                          // Closing bracket
-		.     '(?:'
-		.         '('                        // 5: Unroll the loop: Optionally, anything between the opening and closing shortcode tags
-		.             '[^\\[]*+'             // Not an opening bracket
-		.             '(?:'
-		.                 '\\[(?!\\/\\2\\])' // An opening bracket not followed by the closing shortcode tag
-		.                 '[^\\[]*+'         // Not an opening bracket
-		.             ')*+'
-		.         ')'
-		.         '\\[\\/\\2\\]'             // Closing shortcode tag
-		.     ')?'
-		. ')'
-		. '(\\]?)';                          // 6: Optional second closing brocket for escaping shortcodes: [[tag]]
+	return '\[('.$tagregexp.')\b(.*?)(?:(\/))?\](?:(.+?)\[\/\1\])?';
 }
 
 /**
  * Regular Expression callable for do_shortcode() for calling shortcode hook.
- * @see get_shortcode_regex for details of the match array contents.
  *
  * @since 2.5
  * @access private
@@ -220,23 +180,18 @@ function get_shortcode_regex() {
  * @param array $m Regular expression match array
  * @return mixed False on failure.
  */
-function do_shortcode_tag( $m ) {
+function do_shortcode_tag($m) {
 	global $shortcode_tags;
 
-	// allow [[foo]] syntax for escaping a tag
-	if ( $m[1] == '[' && $m[6] == ']' ) {
-		return substr($m[0], 1, -1);
-	}
+	$tag = $m[1];
+	$attr = shortcode_parse_atts($m[2]);
 
-	$tag = $m[2];
-	$attr = shortcode_parse_atts( $m[3] );
-
-	if ( isset( $m[5] ) ) {
+	if ( isset($m[4]) ) {
 		// enclosing tag - extra parameter
-		return $m[1] . call_user_func( $shortcode_tags[$tag], $attr, $m[5], $tag ) . $m[6];
+		return call_user_func($shortcode_tags[$tag], $attr, $m[4], $tag);
 	} else {
 		// self-closing tag
-		return $m[1] . call_user_func( $shortcode_tags[$tag], $attr, null,  $tag ) . $m[6];
+		return call_user_func($shortcode_tags[$tag], $attr, NULL, $tag);
 	}
 }
 
@@ -320,16 +275,9 @@ function strip_shortcodes( $content ) {
 
 	$pattern = get_shortcode_regex();
 
-	return preg_replace_callback( "/$pattern/s", 'strip_shortcode_tag', $content );
-}
-
-function strip_shortcode_tag( $m ) {
-	// allow [[foo]] syntax for escaping a tag
-	if ( $m[1] == '[' && $m[6] == ']' ) {
-		return substr($m[0], 1, -1);
-	}
-
-	return $m[1] . $m[6];
+	return preg_replace('/'.$pattern.'/s', '', $content);
 }
 
 add_filter('the_content', 'do_shortcode', 11); // AFTER wpautop()
+
+?>

@@ -1,25 +1,26 @@
 var wpAjax = jQuery.extend( {
 	unserialize: function( s ) {
-		var r = {}, q, pp, i, p;
-		if ( !s ) { return r; }
-		q = s.split('?'); if ( q[1] ) { s = q[1]; }
-		pp = s.split('&');
-		for ( i in pp ) {
+		var r = {}; if ( !s ) { return r; }
+		var q = s.split('?'); if ( q[1] ) { s = q[1]; }
+		var pp = s.split('&');
+		for ( var i in pp ) {
 			if ( jQuery.isFunction(pp.hasOwnProperty) && !pp.hasOwnProperty(i) ) { continue; }
-			p = pp[i].split('=');
+			var p = pp[i].split('=');
 			r[p[0]] = p[1];
 		}
 		return r;
 	},
 	parseAjaxResponse: function( x, r, e ) { // 1 = good, 0 = strange (bad data?), -1 = you lack permission
-		var parsed = {}, re = jQuery('#' + r).html(''), err = '';
-
+		var parsed = {};
+		var re = jQuery('#' + r).html('');
 		if ( x && typeof x == 'object' && x.getElementsByTagName('wp_ajax') ) {
 			parsed.responses = [];
 			parsed.errors = false;
+			var err = '';
 			jQuery('response', x).each( function() {
-				var th = jQuery(this), child = jQuery(this.firstChild), response;
-				response = { action: th.attr('action'), what: child.get(0).nodeName, id: child.attr('id'), oldId: child.attr('old_id'), position: child.attr('position') };
+				var th = jQuery(this);
+				var child = jQuery(this.firstChild);
+				var response = { action: th.attr('action'), what: child.get(0).nodeName, id: child.attr('id'), oldId: child.attr('old_id'), position: child.attr('position') };
 				response.data = jQuery( 'response_data', child ).text();
 				response.supplemental = {};
 				if ( !jQuery( 'supplemental', child ).children().each( function() {
@@ -27,11 +28,11 @@ var wpAjax = jQuery.extend( {
 				} ).size() ) { response.supplemental = false }
 				response.errors = [];
 				if ( !jQuery('wp_error', child).each( function() {
-					var code = jQuery(this).attr('code'), anError, errorData, formField;
-					anError = { code: code, message: this.firstChild.nodeValue, data: false };
-					errorData = jQuery('wp_error_data[code="' + code + '"]', x);
+					var code = jQuery(this).attr('code');
+					var anError = { code: code, message: this.firstChild.nodeValue, data: false };
+					var errorData = jQuery('wp_error_data[code="' + code + '"]', x);
 					if ( errorData ) { anError.data = errorData.get(); }
-					formField = jQuery( 'form-field', errorData ).text();
+					var formField = jQuery( 'form-field', errorData ).text();
 					if ( formField ) { code = formField; }
 					if ( e ) { wpAjax.invalidateForm( jQuery('#' + e + ' :input[name="' + code + '"]' ).parents('.form-field:first') ); }
 					err += '<p>' + anError.message + '</p>';
@@ -50,15 +51,10 @@ var wpAjax = jQuery.extend( {
 		return true;
 	},
 	invalidateForm: function ( selector ) {
-		return jQuery( selector ).addClass( 'form-invalid' ).find('input:visible').change( function() { jQuery(this).closest('.form-invalid').removeClass( 'form-invalid' ); } );
+		return jQuery( selector ).addClass( 'form-invalid' ).change( function() { jQuery(this).removeClass( 'form-invalid' ); } );
 	},
 	validateForm: function( selector ) {
 		selector = jQuery( selector );
-		return !wpAjax.invalidateForm( selector.find('.form-required').filter( function() { return jQuery('input:visible', this).val() == ''; } ) ).size();
+		return !wpAjax.invalidateForm( selector.find('.form-required').andSelf().filter('.form-required:has(:input[value=""]), .form-required:input[value=""]') ).size();
 	}
 }, wpAjax || { noPerm: 'You do not have permission to do that.', broken: 'An unidentified error has occurred.' } );
-
-// Basic form validation
-jQuery(document).ready( function($){
-	$('form.validate').submit( function() { return wpAjax.validateForm( $(this) ); } );
-});

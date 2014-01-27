@@ -278,10 +278,7 @@ class ftp_base {
 	        $dns=@gethostbyaddr($host);
 	        if(!$ip) $ip=$host;
 	        if(!$dns) $dns=$host;
-	        // Validate the IPAddress PHP4 returns -1 for invalid, PHP5 false
-	        // -1 === "255.255.255.255" which is the broadcast address which is also going to be invalid
-	        $ipaslong = ip2long($ip);
-			if ( ($ipaslong == false) || ($ipaslong === -1) ) {
+			if(ip2long($ip) === -1) {
 				$this->SendMSG("Wrong host name/address \"".$host."\"");
 				return FALSE;
 			}
@@ -495,7 +492,7 @@ class ftp_base {
 		$this->_features=array();
 		foreach($f as $k=>$v) {
 			$v=explode(" ", trim($v));
-			$this->_features[array_shift($v)]=$v;
+			$this->_features[array_shift($v)]=$v;;
 		}
 		return true;
 	}
@@ -896,12 +893,11 @@ class ftp_base {
 	}
 }
 
-$mod_sockets = extension_loaded( 'sockets' );
-if ( ! $mod_sockets && function_exists( 'dl' ) && is_callable( 'dl' ) ) {
-	$prefix = ( PHP_SHLIB_SUFFIX == 'dll' ) ? 'php_' : '';
-	@dl( $prefix . 'sockets.' . PHP_SHLIB_SUFFIX );
-	$mod_sockets = extension_loaded( 'sockets' );
+$mod_sockets=TRUE;
+if (!extension_loaded('sockets')) {
+	$prefix = (PHP_SHLIB_SUFFIX == 'dll') ? 'php_' : '';
+	if(!@dl($prefix . 'sockets.' . PHP_SHLIB_SUFFIX)) $mod_sockets=FALSE;
 }
 
-require_once "class-ftp-" . ( $mod_sockets ? "sockets" : "pure" ) . ".php";
+require_once "class-ftp-".($mod_sockets?"sockets":"pure").".php";
 ?>

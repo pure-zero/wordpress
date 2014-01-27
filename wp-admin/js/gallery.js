@@ -1,63 +1,33 @@
-jQuery(document).ready(function($) {
-	var gallerySortable, gallerySortableInit, w, desc = false;
-
-	gallerySortableInit = function() {
+jQuery(function($) {
+	var gallerySortable;
+	var gallerySortableInit = function() {
 		gallerySortable = $('#media-items').sortable( {
-			items: 'div.media-item',
+			items: '.media-item',
 			placeholder: 'sorthelper',
 			axis: 'y',
 			distance: 2,
-			handle: 'div.filename',
-			stop: function(e, ui) {
-				// When an update has occurred, adjust the order for each item
-				var all = $('#media-items').sortable('toArray'), len = all.length;
-				$.each(all, function(i, id) {
-					var order = desc ? (len - i) : (1 + i);
-					$('#' + id + ' .menu_order input').val(order);
-				});
-			}
+			update: galleryReorder
 		} );
 	}
 
-	sortIt = function() {
-		var all = $('.menu_order_input'), len = all.length;
-		all.each(function(i){
-			var order = desc ? (len - i) : (1 + i);
-			$(this).val(order);
+	// When an update has occurred, adjust the order for each item
+	var galleryReorder = function(e, sort) {
+		jQuery.each(sort['element'].sortable('toArray'), function(i, id) {
+			jQuery('#' + id + ' .menu_order input')[0].value = (1+i);
 		});
 	}
-
-	clearAll = function(c) {
-		c = c || 0;
-		$('.menu_order_input').each(function(){
-			if ( this.value == '0' || c ) this.value = '';
-		});
-	}
-
-	$('#asc').click(function(){desc = false; sortIt(); return false;});
-	$('#desc').click(function(){desc = true; sortIt(); return false;});
-	$('#clear').click(function(){clearAll(1); return false;});
-	$('#showall').click(function(){
-		$('#sort-buttons span a').toggle();
-		$('a.describe-toggle-on').hide();
-		$('a.describe-toggle-off, table.slidetoggle').show();
-		$('img.pinkynail').toggle(false);
-		return false;
-	});
-	$('#hideall').click(function(){
-		$('#sort-buttons span a').toggle();
-		$('a.describe-toggle-on').show();
-		$('a.describe-toggle-off, table.slidetoggle').hide();
-		$('img.pinkynail').toggle(true);
-		return false;
-	});
 
 	// initialize sortable
 	gallerySortableInit();
-	clearAll();
+});
+
+jQuery(document).ready(function($){
+	$('.menu_order_input').each(function(){
+		if ( this.value == '0' ) this.value = '';
+	});
 
 	if ( $('#media-items>*').length > 1 ) {
-		w = wpgallery.getWin();
+		var w = wpgallery.getWin();
 
 		$('#save-all, #gallery-settings').show();
 		if ( typeof w.tinyMCE != 'undefined' && w.tinyMCE.activeEditor && ! w.tinyMCE.activeEditor.isHidden() ) {
@@ -72,9 +42,9 @@ jQuery(document).ready(function($) {
 jQuery(window).unload( function () { tinymce = tinyMCE = wpgallery = null; } ); // Cleanup
 
 /* gallery settings */
-var tinymce = null, tinyMCE, wpgallery;
+var tinymce = null, tinyMCE;
 
-wpgallery = {
+var wpgallery = {
 	mcemode : false,
 	editor : {},
 	dom : {},
@@ -112,10 +82,18 @@ wpgallery = {
 		return window.dialogArguments || opener || parent || top;
 	},
 
+	restoreSelection : function() {
+		var t = this;
+
+		if (tinymce.isIE)
+			t.editor.selection.moveToBookmark(t.editor.windowManager.bookmark);
+	},
+
 	setup : function() {
-		var t = this, a, ed = t.editor, g, columns, link, order, orderby;
+		var t = this, a, f = document.forms[0], ed = t.editor, el, g;
 		if ( ! t.mcemode ) return;
 
+		t.restoreSelection();
 		t.el = ed.selection.getNode();
 
 		if ( t.el.nodeName != 'IMG' || ! ed.dom.hasClass(t.el, 'wpGallery') ) {
@@ -138,10 +116,8 @@ wpgallery = {
 			jQuery('#update-gallery').show();
 			t.is_update = true;
 
-			columns = a.match(/columns=['"]([0-9]+)['"]/);
-			link = a.match(/link=['"]([^'"]+)['"]/i);
-			order = a.match(/order=['"]([^'"]+)['"]/i);
-			orderby = a.match(/orderby=['"]([^'"]+)['"]/i);
+			var columns = a.match(/columns=['"]([0-9]+)['"]/), link = a.match(/link=['"]([^'"]+)['"]/i);
+			var order = a.match(/order=['"]([^'"]+)['"]/i), orderby = a.match(/orderby=['"]([^'"]+)['"]/i), all = '';
 
 			if ( link && link[1] ) t.I('linkto-file').checked = "checked";
 			if ( order && order[1] ) t.I('order-desc').checked = "checked";
@@ -153,10 +129,10 @@ wpgallery = {
 	},
 
 	update : function() {
-		var t = this, ed = t.editor, all = '', s;
+		var t = this, ed = t.editor, el, all = '';
 
 		if ( ! t.mcemode || ! t.is_update ) {
-			s = '[gallery'+t.getSettings()+']';
+			var s = '[gallery'+t.getSettings()+']';
 			t.getWin().send_to_editor(s);
 			return;
 		}

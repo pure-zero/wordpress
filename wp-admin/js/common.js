@@ -1,85 +1,241 @@
-var showNotice, adminMenu, columns, validateForm, screenMeta;
-(function($){
-// Removed in 3.3.
-// (perhaps) needed for back-compat
-adminMenu = {
-	init : function() {},
-	fold : function() {},
-	restoreMenuState : function() {},
-	toggle : function() {},
-	favorites : function() {}
+
+var wpCookies = {
+// The following functions are from Cookie.js class in TinyMCE, Moxiecode, used under LGPL.
+
+	each : function(o, cb, s) {
+		var n, l;
+
+		if (!o)
+			return 0;
+
+		s = s || o;
+
+		if (typeof(o.length) != 'undefined') {
+			for (n=0, l = o.length; n<l; n++) {
+				if (cb.call(s, o[n], n, o) === false)
+					return 0;
+			}
+		} else {
+			for (n in o) {
+				if (o.hasOwnProperty(n)) {
+					if (cb.call(s, o[n], n, o) === false)
+						return 0;
+				}
+			}
+		}
+		return 1;
+	},
+
+	getHash : function(n) {
+		var v = this.get(n), h;
+
+		if (v) {
+			this.each(v.split('&'), function(v) {
+				v = v.split('=');
+				h = h || {};
+				h[v[0]] = v[1];
+			});
+		}
+		return h;
+	},
+
+	setHash : function(n, v, e, p, d, s) {
+		var o = '';
+
+		this.each(v, function(v, k) {
+			o += (!o ? '' : '&') + k + '=' + v;
+		});
+
+		this.set(n, o, e, p, d, s);
+	},
+
+	get : function(n) {
+		var c = document.cookie, e, p = n + "=", b;
+
+		if (!c)
+			return;
+
+		b = c.indexOf("; " + p);
+
+		if (b == -1) {
+			b = c.indexOf(p);
+
+			if (b != 0)
+				return null;
+		} else
+			b += 2;
+
+		e = c.indexOf(";", b);
+
+		if (e == -1)
+			e = c.length;
+
+		return decodeURIComponent(c.substring(b + p.length, e));
+	},
+
+	set : function(n, v, e, p, d, s) {
+		document.cookie = n + "=" + encodeURIComponent(v) +
+			((e) ? "; expires=" + e.toGMTString() : "") +
+			((p) ? "; path=" + p : "") +
+			((d) ? "; domain=" + d : "") +
+			((s) ? "; secure" : "");
+	},
+
+	remove : function(n, p) {
+		var d = new Date();
+
+		d.setTime(d.getTime() - 1000);
+
+		this.set(n, '', d, p, d);
+	}
 };
 
-// show/hide/save table columns
-columns = {
-	init : function() {
-		var that = this;
-		$('.hide-column-tog', '#adv-settings').click( function() {
-			var $t = $(this), column = $t.val();
-			if ( $t.prop('checked') )
-				that.checked(column);
-			else
-				that.unchecked(column);
+// Returns the value as string. Second arg or empty string is returned when value is not set.
+function getUserSetting( name, def ) {
+	var o = getAllUserSettings();
 
-			columns.saveManageColumnsState();
-		});
-	},
+	if ( o.hasOwnProperty(name) )
+		return o[name];
 
-	saveManageColumnsState : function() {
-		var hidden = this.hidden();
-		$.post(ajaxurl, {
-			action: 'hidden-columns',
-			hidden: hidden,
-			screenoptionnonce: $('#screenoptionnonce').val(),
-			page: pagenow
-		});
-	},
+	if ( typeof def != 'undefined' )
+		return def;
 
-	checked : function(column) {
-		$('.column-' + column).show();
-		this.colSpanChange(+1);
-	},
+	return '';
+}
 
-	unchecked : function(column) {
-		$('.column-' + column).hide();
-		this.colSpanChange(-1);
-	},
+// Both name and value must be only ASCII letters, numbers or underscore
+// and the shorter, the better (cookies can store maximum 4KB). Not suitable to store text.
+function setUserSetting( name, value, del ) {
+	var c = 'wp-settings-'+userSettings.uid, o = wpCookies.getHash(c) || {}, d = new Date();
+	var n = name.toString().replace(/[^A-Za-z0-9_]/, ''), v = value.toString().replace(/[^A-Za-z0-9_]/, '');
 
-	hidden : function() {
-		return $('.manage-column').filter(':hidden').map(function() { return this.id; }).get().join(',');
-	},
+	if ( del ) delete o[n];
+	else o[n] = v;
 
-	useCheckboxesForHidden : function() {
-		this.hidden = function(){
-			return $('.hide-column-tog').not(':checked').map(function() {
-				var id = this.id;
-				return id.substring( id, id.length - 5 );
-			}).get().join(',');
-		};
-	},
+	d.setTime( d.getTime() + 31536000000 );
+	p = userSettings.url;
 
-	colSpanChange : function(diff) {
-		var $t = $('table').find('.colspanchange'), n;
-		if ( !$t.length )
-			return;
-		n = parseInt( $t.attr('colspan'), 10 ) + diff;
-		$t.attr('colspan', n.toString());
+	wpCookies.setHash(c, o, d, p );
+	wpCookies.set('wp-settings-time-'+userSettings.uid, userSettings.time, d, p );
+}
+
+function deleteUserSetting( name ) {
+	setUserSetting( name, '', 1 );
+}
+
+// Returns all settings as js object.
+function getAllUserSettings() {
+	return wpCookies.getHash('wp-settings-'+userSettings.uid) || {};
+}
+
+
+jQuery(document).ready( function($) {
+	// pulse
+	$('.fade').animate( { backgroundColor: '#ffffe0' }, 300).animate( { backgroundColor: '#fffbcc' }, 300).animate( { backgroundColor: '#ffffe0' }, 300).animate( { backgroundColor: '#fffbcc' }, 300);
+
+	// show things that should be visible, hide what should be hidden
+	$('.hide-if-no-js').removeClass('hide-if-no-js');
+	$('.hide-if-js').hide();
+
+	// Basic form validation
+	if ( ( 'undefined' != typeof wpAjax ) && $.isFunction( wpAjax.validateForm ) ) {
+		$('form.validate').submit( function() { return wpAjax.validateForm( $(this) ); } );
 	}
-}
 
-$(document).ready(function(){columns.init();});
+	// Move .updated and .error alert boxes
+	$('div.wrap h2 ~ div.updated, div.wrap h2 ~ div.error').addClass('below-h2');
+	$('div.updated, div.error').not('.below-h2').insertAfter('div.wrap h2:first');
 
-validateForm = function( form ) {
-	return !$( form ).find('.form-required').filter( function() { return $('input:visible', this).val() == ''; } ).addClass( 'form-invalid' ).find('input:visible').change( function() { $(this).closest('.form-invalid').removeClass( 'form-invalid' ); } ).size();
-}
+	// screen settings tab
+	$('#show-settings-link').click(function () {
+		if ( ! $('#screen-options-wrap').hasClass('screen-options-open') ) {
+			$('#contextual-help-link-wrap').addClass('invisible');
+		}
+		$('#screen-options-wrap').slideToggle('fast', function(){
+			if ( $(this).hasClass('screen-options-open') ) {
+				$('#show-settings-link').css({'backgroundImage':'url("images/screen-options-right.gif")'});
+				$('#contextual-help-link-wrap').removeClass('invisible');
+				$(this).removeClass('screen-options-open');
+
+			} else {
+				$('#show-settings-link').css({'backgroundImage':'url("images/screen-options-right-up.gif")'});
+				$(this).addClass('screen-options-open');
+			}
+		});
+		return false;
+	});
+
+	// help tab
+	$('#contextual-help-link').click(function () {
+		if ( ! $('#contextual-help-wrap').hasClass('contextual-help-open') ) {
+			$('#screen-options-link-wrap').addClass('invisible');
+		}
+		$('#contextual-help-wrap').slideToggle('fast', function(){
+			if ( $(this).hasClass('contextual-help-open') ) {
+				$('#contextual-help-link').css({'backgroundImage':'url("images/screen-options-right.gif")'});
+				$('#screen-options-link-wrap').removeClass('invisible');
+				$(this).removeClass('contextual-help-open');
+			} else {
+				$('#contextual-help-link').css({'backgroundImage':'url("images/screen-options-right-up.gif")'});
+				$(this).addClass('contextual-help-open');
+			}
+		});
+		return false;
+	});
+
+	// check all checkboxes
+	var lastClicked = false;
+	$( 'table:visible tbody .check-column :checkbox' ).click( function(e) {
+		if ( 'undefined' == e.shiftKey ) { return true; }
+		if ( e.shiftKey ) {
+			if ( !lastClicked ) { return true; }
+			var checks = $( lastClicked ).parents( 'form:first' ).find( ':checkbox' );
+			var first = checks.index( lastClicked );
+			var last = checks.index( this );
+			var checked = $(this).attr('checked');
+			if ( 0 < first && 0 < last && first != last ) {
+				checks.slice( first, last ).attr( 'checked', function(){
+					if ( $(this).parents('tr').is(':visible') )
+						return checked ? 'checked' : '';
+
+					return '';
+				});
+			}
+		}
+		lastClicked = this;
+		return true;
+	} );
+	$( 'thead :checkbox, tfoot :checkbox' ).click( function(e) {
+		var c = $(this).attr('checked');
+		if ( 'undefined' == typeof  toggleWithKeyboard)
+			toggleWithKeyboard = false;
+		var toggle = e.shiftKey || toggleWithKeyboard;
+		$(this).parents( 'form:first' ).find( 'table tbody:visible').find( '.check-column :checkbox' ).attr( 'checked', function() {
+			if ( $(this).parents('tr').is(':hidden') )
+				return '';
+			if ( toggle )
+				return $(this).attr( 'checked' ) ? '' : 'checked';
+			else if (c)
+				return 'checked';
+			return '';
+		});
+		$(this).parents( 'form:first' ).find( 'table thead:visible, table tfoot:visible').find( '.check-column :checkbox' ).attr( 'checked', function() {
+			if ( toggle )
+				return '';
+			else if (c)
+				return 'checked';
+			return '';
+		});
+	});
+});
+
+var showNotice, adminMenu, columns;
 
 // stub for doing better warnings
 showNotice = {
-	warn : function() {
-		var msg = commonL10n.warnDelete || '';
-		if ( confirm(msg) ) {
+	warn : function(text) {
+		if ( confirm(text) )
 			return true;
-		}
 
 		return false;
 	},
@@ -89,339 +245,151 @@ showNotice = {
 	}
 };
 
-screenMeta = {
-	element: null, // #screen-meta
-	toggles: null, // .screen-meta-toggle
-	page:    null, // #wpcontent
+(function($){
+// sidebar admin menu
+adminMenu = {
 
-	init: function() {
-		this.element = $('#screen-meta');
-		this.toggles = $('.screen-meta-toggle a');
-		this.page    = $('#wpcontent');
+	init : function() {
+		$('#adminmenu div.wp-menu-toggle').each( function() {
+			if ( $(this).siblings('.wp-submenu').length )
+				$(this).click(function(){ adminMenu.toggle( $(this).siblings('.wp-submenu') ); });
+			else
+				$(this).hide();
+		});
+		$('#adminmenu li.menu-top .wp-menu-image').click( function() { window.location = $(this).siblings('a.menu-top')[0].href; } );
+		this.favorites();
 
-		this.toggles.click( this.toggleEvent );
+		$('.wp-menu-separator').click(function(){
+			if ( $('#wpcontent').hasClass('folded') ) {
+				adminMenu.fold(1);
+				setUserSetting( 'mfold', 'o' );
+			} else {
+				adminMenu.fold();
+				setUserSetting( 'mfold', 'f' );
+			}
+		});
+
+		if ( 'f' != getUserSetting( 'mfold' ) ) {
+			this.restoreMenuState();
+		} else {
+			this.fold();
+		}
 	},
 
-	toggleEvent: function( e ) {
-		var panel = $( this.href.replace(/.+#/, '#') );
-		e.preventDefault();
+	restoreMenuState : function() {
+		$('#adminmenu li.wp-has-submenu').each(function(i, e) {
+			var v = getUserSetting( 'm'+i );
+			if ( $(e).hasClass('wp-has-current-submenu') ) return true; // leave the current parent open
 
-		if ( !panel.length )
-			return;
-
-		if ( panel.is(':visible') )
-			screenMeta.close( panel, $(this) );
-		else
-			screenMeta.open( panel, $(this) );
-	},
-
-	open: function( panel, link ) {
-
-		$('.screen-meta-toggle').not( link.parent() ).css('visibility', 'hidden');
-
-		panel.parent().show();
-		panel.slideDown( 'fast', function() {
-			panel.focus();
-			link.addClass('screen-meta-active').attr('aria-expanded', true);
+			if ( 'o' == v ) $(e).addClass('wp-menu-open');
+			else if ( 'c' == v ) $(e).removeClass('wp-menu-open');
 		});
 	},
 
-	close: function( panel, link ) {
-		panel.slideUp( 'fast', function() {
-			link.removeClass('screen-meta-active').attr('aria-expanded', false);
-			$('.screen-meta-toggle').css('visibility', '');
-			panel.parent().hide();
+	toggle : function(el) {
+
+		el['slideToggle'](150, function(){el.css('display','');}).parent().toggleClass( 'wp-menu-open' );
+
+		$('#adminmenu li.wp-has-submenu').each(function(i, e) {
+			var v = $(e).hasClass('wp-menu-open') ? 'o' : 'c';
+			setUserSetting( 'm'+i, v );
 		});
+
+		return false;
+	},
+
+	fold : function(off) {
+		if (off) {
+			$('#wpcontent').removeClass('folded');
+			$('#adminmenu li.wp-has-submenu').unbind();
+		} else {
+			$('#wpcontent').addClass('folded');
+			$('#adminmenu li.wp-has-submenu').hoverIntent({
+				over: function(e){
+					var m = $(this).find('.wp-submenu'), t = e.clientY, H = $(window).height(), h = m.height(), o;
+
+					if ( (t+h+10) > H ) {
+						o = (t+h+10) - H;
+						m.css({'marginTop':'-'+o+'px'});
+					} else if ( m.css('marginTop') ) {
+						m.css({'marginTop':''})
+					}
+					m.addClass('sub-open');
+				},
+				out: function(){ $(this).find('.wp-submenu').removeClass('sub-open').css({'marginTop':''}); },
+				timeout: 220,
+				sensitivity: 8,
+				interval: 100
+			});
+
+		}
+	},
+
+	favorites : function() {
+		$('#favorite-inside').width($('#favorite-actions').width()-4);
+		$('#favorite-toggle, #favorite-inside').bind( 'mouseenter', function(){$('#favorite-inside').removeClass('slideUp').addClass('slideDown'); setTimeout(function(){if ( $('#favorite-inside').hasClass('slideDown') ) { $('#favorite-inside').slideDown(100); $('#favorite-first').addClass('slide-down'); }}, 200) } );
+
+		$('#favorite-toggle, #favorite-inside').bind( 'mouseleave', function(){$('#favorite-inside').removeClass('slideDown').addClass('slideUp'); setTimeout(function(){if ( $('#favorite-inside').hasClass('slideUp') ) { $('#favorite-inside').slideUp(100, function(){ $('#favorite-first').removeClass('slide-down'); } ); }}, 300) } );
 	}
 };
 
-/**
- * Help tabs.
- */
-$('.contextual-help-tabs').delegate('a', 'click focus', function(e) {
-	var link = $(this),
-		panel;
+$(document).ready(function(){adminMenu.init();});
+})(jQuery);
 
-	e.preventDefault();
-
-	// Don't do anything if the click is for the tab already showing.
-	if ( link.is('.active a') )
-		return false;
-
-	// Links
-	$('.contextual-help-tabs .active').removeClass('active');
-	link.parent('li').addClass('active');
-
-	panel = $( link.attr('href') );
-
-	// Panels
-	$('.help-tab-content').not( panel ).removeClass('active').hide();
-	panel.addClass('active').show();
-});
-
-$(document).ready( function() {
-	var lastClicked = false, checks, first, last, checked, menu = $('#adminmenu'), mobileEvent,
-		pageInput = $('input.current-page'), currentPage = pageInput.val();
-
-	// when the menu is folded, make the fly-out submenu header clickable
-	menu.on('click.wp-submenu-head', '.wp-submenu-head', function(e){
-		$(e.target).parent().siblings('a').get(0).click();
-	});
-
-	$('#collapse-menu').on('click.collapse-menu', function(e){
-		var body = $(document.body);
-
-		// reset any compensation for submenus near the bottom of the screen
-		$('#adminmenu div.wp-submenu').css('margin-top', '');
-
-		if ( $(window).width() < 900 ) {
-			if ( body.hasClass('auto-fold') ) {
-				body.removeClass('auto-fold');
-				setUserSetting('unfold', 1);
-				body.removeClass('folded');
-				deleteUserSetting('mfold');
+(function($){
+// show/hide/save table columns
+columns = {
+	init : function(page) {
+		$('.hide-column-tog').click( function() {
+			var column = $(this).val();
+			var show = $(this).attr('checked');
+			if ( show ) {
+				$('.column-' + column).show();
 			} else {
-				body.addClass('auto-fold');
-				deleteUserSetting('unfold');
+				$('.column-' + column).hide();
 			}
-		} else {
-			if ( body.hasClass('folded') ) {
-				body.removeClass('folded');
-				deleteUserSetting('mfold');
-			} else {
-				body.addClass('folded');
-				setUserSetting('mfold', 'f');
-			}
-		}
-	});
+			columns.save_manage_columns_state(page);
+		} );
+	},
 
-	if ( 'ontouchstart' in window || /IEMobile\/[1-9]/.test(navigator.userAgent) ) { // touch screen device
-		// iOS Safari works with touchstart, the rest work with click
-		mobileEvent = /Mobile\/.+Safari/.test(navigator.userAgent) ? 'touchstart' : 'click';
-
-		// close any open submenus when touch/click is not on the menu
-		$(document.body).on( mobileEvent+'.wp-mobile-hover', function(e) {
-			if ( !$(e.target).closest('#adminmenu').length )
-				menu.find('li.wp-has-submenu.opensub').removeClass('opensub');
-		});
-
-		menu.find('a.wp-has-submenu').on( mobileEvent+'.wp-mobile-hover', function(e) {
-			var el = $(this), parent = el.parent();
-
-			// Show the sub instead of following the link if:
-			//	- the submenu is not open
-			//	- the submenu is not shown inline or the menu is not folded
-			if ( !parent.hasClass('opensub') && ( !parent.hasClass('wp-menu-open') || parent.width() < 40 ) ) {
-				e.preventDefault();
-				menu.find('li.opensub').removeClass('opensub');
-				parent.addClass('opensub');
-			}
+	save_manage_columns_state : function(page) {
+		var hidden = $('.manage-column').filter(':hidden').map(function() { return this.id; }).get().join(',');
+		$.post('admin-ajax.php', {
+			action: 'hidden-columns',
+			hidden: hidden,
+			hiddencolumnsnonce: $('#hiddencolumnsnonce').val(),
+			page: page
 		});
 	}
-
-	menu.find('li.wp-has-submenu').hoverIntent({
-		over: function(e){
-			var b, h, o, f, m = $(this).find('.wp-submenu'), menutop, wintop, maxtop, top = parseInt( m.css('top'), 10 );
-
-			if ( isNaN(top) || top > -5 ) // meaning the submenu is visible
-				return;
-
-			menutop = $(this).offset().top;
-			wintop = $(window).scrollTop();
-			maxtop = menutop - wintop - 30; // max = make the top of the sub almost touch admin bar
-
-			b = menutop + m.height() + 1; // Bottom offset of the menu
-			h = $('#wpwrap').height(); // Height of the entire page
-			o = 60 + b - h;
-			f = $(window).height() + wintop - 15; // The fold
-
-			if ( f < (b - o) )
-				o = b - f;
-
-			if ( o > maxtop )
-				o = maxtop;
-
-			if ( o > 1 )
-				m.css('margin-top', '-'+o+'px');
-			else
-				m.css('margin-top', '');
-
-			menu.find('li.menu-top').removeClass('opensub');
-			$(this).addClass('opensub');
-		},
-		out: function(){
-			$(this).removeClass('opensub').find('.wp-submenu').css('margin-top', '');
-		},
-		timeout: 200,
-		sensitivity: 7,
-		interval: 90
-	});
-
-	menu.on('focus.adminmenu', '.wp-submenu a', function(e){
-		$(e.target).closest('li.menu-top').addClass('opensub');
-	}).on('blur.adminmenu', '.wp-submenu a', function(e){
-		$(e.target).closest('li.menu-top').removeClass('opensub');
-	});
-
-	// Move .updated and .error alert boxes. Don't move boxes designed to be inline.
-	$('div.wrap h2:first').nextAll('div.updated, div.error').addClass('below-h2');
-	$('div.updated, div.error').not('.below-h2, .inline').insertAfter( $('div.wrap h2:first') );
-
-	// Init screen meta
-	screenMeta.init();
-
-	// check all checkboxes
-	$('tbody').children().children('.check-column').find(':checkbox').click( function(e) {
-		if ( 'undefined' == e.shiftKey ) { return true; }
-		if ( e.shiftKey ) {
-			if ( !lastClicked ) { return true; }
-			checks = $( lastClicked ).closest( 'form' ).find( ':checkbox' );
-			first = checks.index( lastClicked );
-			last = checks.index( this );
-			checked = $(this).prop('checked');
-			if ( 0 < first && 0 < last && first != last ) {
-				checks.slice( first, last ).prop( 'checked', function(){
-					if ( $(this).closest('tr').is(':visible') )
-						return checked;
-
-					return false;
-				});
-			}
-		}
-		lastClicked = this;
-
-		// toggle "check all" checkboxes
-		var unchecked = $(this).closest('tbody').find(':checkbox').filter(':visible').not(':checked');
-		$(this).closest('table').children('thead, tfoot').find(':checkbox').prop('checked', function() {
-			return ( 0 == unchecked.length );
-		});
-
-		return true;
-	});
-
-	$('thead, tfoot').find('.check-column :checkbox').click( function(e) {
-		var c = $(this).prop('checked'),
-			kbtoggle = 'undefined' == typeof toggleWithKeyboard ? false : toggleWithKeyboard,
-			toggle = e.shiftKey || kbtoggle;
-
-		$(this).closest( 'table' ).children( 'tbody' ).filter(':visible')
-		.children().children('.check-column').find(':checkbox')
-		.prop('checked', function() {
-			if ( $(this).closest('tr').is(':hidden') )
-				return false;
-			if ( toggle )
-				return $(this).prop( 'checked' );
-			else if (c)
-				return true;
-			return false;
-		});
-
-		$(this).closest('table').children('thead,  tfoot').filter(':visible')
-		.children().children('.check-column').find(':checkbox')
-		.prop('checked', function() {
-			if ( toggle )
-				return false;
-			else if (c)
-				return true;
-			return false;
-		});
-	});
-
-	$('#default-password-nag-no').click( function() {
-		setUserSetting('default_password_nag', 'hide');
-		$('div.default-password-nag').hide();
-		return false;
-	});
-
-	// tab in textareas
-	$('#newcontent').bind('keydown.wpevent_InsertTab', function(e) {
-		var el = e.target, selStart, selEnd, val, scroll, sel;
-
-		if ( e.keyCode == 27 ) { // escape key
-			$(el).data('tab-out', true);
-			return;
-		}
-
-		if ( e.keyCode != 9 || e.ctrlKey || e.altKey || e.shiftKey ) // tab key
-			return;
-
-		if ( $(el).data('tab-out') ) {
-			$(el).data('tab-out', false);
-			return;
-		}
-
-		selStart = el.selectionStart;
-		selEnd = el.selectionEnd;
-		val = el.value;
-
-		try {
-			this.lastKey = 9; // not a standard DOM property, lastKey is to help stop Opera tab event. See blur handler below.
-		} catch(err) {}
-
-		if ( document.selection ) {
-			el.focus();
-			sel = document.selection.createRange();
-			sel.text = '\t';
-		} else if ( selStart >= 0 ) {
-			scroll = this.scrollTop;
-			el.value = val.substring(0, selStart).concat('\t', val.substring(selEnd) );
-			el.selectionStart = el.selectionEnd = selStart + 1;
-			this.scrollTop = scroll;
-		}
-
-		if ( e.stopPropagation )
-			e.stopPropagation();
-		if ( e.preventDefault )
-			e.preventDefault();
-	});
-
-	$('#newcontent').bind('blur.wpevent_InsertTab', function(e) {
-		if ( this.lastKey && 9 == this.lastKey )
-			this.focus();
-	});
-
-	if ( pageInput.length ) {
-		pageInput.closest('form').submit( function(e){
-
-			// Reset paging var for new filters/searches but not for bulk actions. See #17685.
-			if ( $('select[name="action"]').val() == -1 && $('select[name="action2"]').val() == -1 && pageInput.val() == currentPage )
-				pageInput.val('1');
-		});
-	}
-
-	// Scroll into view when focused
-	$('#contextual-help-link, #show-settings-link').on( 'focus.scroll-into-view', function(e){
-		if ( e.target.scrollIntoView )
-			e.target.scrollIntoView(false);
-	});
-
-	// Disable upload buttons until files are selected
-	(function(){
-		var button, input, form = $('form.wp-upload-form');
-		if ( ! form.length )
-			return;
-		button = form.find('input[type="submit"]');
-		input = form.find('input[type="file"]');
-
-		function toggleUploadButton() {
-			button.prop('disabled', '' === input.map( function() {
-				return $(this).val();
-			}).get().join(''));
-		}
-		toggleUploadButton();
-		input.on('change', toggleUploadButton);
-	})();
-});
-
-// internal use
-$(document).bind( 'wp_CloseOnEscape', function( e, data ) {
-	if ( typeof(data.cb) != 'function' )
-		return;
-
-	if ( typeof(data.condition) != 'function' || data.condition() )
-		data.cb();
-
-	return true;
-});
+}
 
 })(jQuery);
+
+
+jQuery(document).ready(function($){
+	if ( 'undefined' != typeof google && google.gears ) return;
+
+	var gf = false;
+	if ( 'undefined' != typeof GearsFactory ) {
+		gf = new GearsFactory();
+	} else {
+		try {
+			gf = new ActiveXObject('Gears.Factory');
+			if ( factory.getBuildInfo().indexOf('ie_mobile') != -1 )
+				gf.privateSetGlobalObject(this);
+		} catch (e) {
+			if ( ( 'undefined' != typeof navigator.mimeTypes ) && navigator.mimeTypes['application/x-googlegears'] ) {
+				gf = document.createElement("object");
+				gf.style.display = "none";
+				gf.width = 0;
+				gf.height = 0;
+				gf.type = "application/x-googlegears";
+				document.documentElement.appendChild(gf);
+			}
+		}
+	}
+	if ( gf && gf.hasPermission )
+		return;
+
+	$('.turbo-nag').show();
+});

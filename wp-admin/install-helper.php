@@ -10,6 +10,9 @@
  * needing to use these functions a lot, you might experience time outs. If you
  * do, then it is advised to just write the SQL code yourself.
  *
+ * You can turn debugging on, by setting $debug to 1 after you include this
+ * file.
+ *
  * <code>
  * check_column('wp_links', 'link_description', 'mediumtext');
  * if (check_column($wpdb->comments, 'comment_author', 'tinytext'))
@@ -35,14 +38,31 @@
  * @subpackage Plugin
  */
 
+/**
+ * @global bool $wp_only_load_config
+ * @name $wp_only_load_config
+ * @var bool
+ * @since unknown
+ */
+$wp_only_load_config = true;
+
 /** Load WordPress Bootstrap */
 require_once(dirname(dirname(__FILE__)).'/wp-load.php');
+
+/**
+ * Turn debugging on or off.
+ * @global bool|int $debug
+ * @name $debug
+ * @var bool|int
+ * @since unknown
+ */
+$debug = 0;
 
 if ( ! function_exists('maybe_create_table') ) :
 /**
  * Create database table, if it doesn't already exist.
  *
- * @since 1.0.0
+ * @since unknown
  * @package WordPress
  * @subpackage Plugin
  * @uses $wpdb
@@ -74,10 +94,11 @@ if ( ! function_exists('maybe_add_column') ) :
 /**
  * Add column to database table, if column doesn't already exist in table.
  *
- * @since 1.0.0
+ * @since unknown
  * @package WordPress
  * @subpackage Plugin
  * @uses $wpdb
+ * @uses $debug
  *
  * @param string $table_name Database table name
  * @param string $column_name Table column name
@@ -85,8 +106,9 @@ if ( ! function_exists('maybe_add_column') ) :
  * @return bool False on failure. True, if already exists or was successful.
  */
 function maybe_add_column($table_name, $column_name, $create_ddl) {
-	global $wpdb;
+	global $wpdb, $debug;
 	foreach ($wpdb->get_col("DESC $table_name",0) as $column ) {
+		if ($debug) echo("checking $column == $column_name<br />");
 
 		if ($column == $column_name) {
 			return true;
@@ -107,7 +129,7 @@ endif;
 /**
  * Drop column from database table, if it exists.
  *
- * @since 1.0.0
+ * @since unknown
  * @package WordPress
  * @subpackage Plugin
  * @uses $wpdb
@@ -151,7 +173,7 @@ function maybe_drop_column($table_name, $column_name, $drop_ddl) {
  *      Default
  *      Extra
  *
- * @since 1.0.0
+ * @since unknown
  * @package WordPress
  * @subpackage Plugin
  *
@@ -165,14 +187,16 @@ function maybe_drop_column($table_name, $column_name, $drop_ddl) {
  * @return bool True, if matches. False, if not matching.
  */
 function check_column($table_name, $col_name, $col_type, $is_null = null, $key = null, $default = null, $extra = null) {
-	global $wpdb;
+	global $wpdb, $debug;
 	$diffs = 0;
 	$results = $wpdb->get_results("DESC $table_name");
 
 	foreach ($results as $row ) {
+		if ($debug > 1) print_r($row);
 
 		if ($row->Field == $col_name) {
 			// got our column, check the params
+			if ($debug) echo ("checking $row->Type against $col_type\n");
 			if (($col_type != null) && ($row->Type != $col_type)) {
 				++$diffs;
 			}
@@ -189,6 +213,7 @@ function check_column($table_name, $col_name, $col_type, $is_null = null, $key =
 				++$diffs;
 			}
 			if ($diffs > 0) {
+				if ($debug) echo ("diffs = $diffs returning false\n");
 				return false;
 			}
 			return true;
@@ -196,3 +221,5 @@ function check_column($table_name, $col_name, $col_type, $is_null = null, $key =
 	}
 	return false;
 }
+
+?>

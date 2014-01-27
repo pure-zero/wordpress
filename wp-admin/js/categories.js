@@ -1,34 +1,37 @@
-jQuery(document).ready(function($) {
-	var options = false, addAfter, delBefore, delAfter;
+jQuery(function($) {
+	var options = false
 	if ( document.forms['addcat'].category_parent )
 		options = document.forms['addcat'].category_parent.options;
 
-	addAfter = function( r, settings ) {
-		var name, id;
-
-		name = $("<span>" + $('name', r).text() + "</span>").text();
-		id = $('cat', r).attr('id');
+	var addAfter = function( r, settings ) {
+		var name = $("<span>" + $('name', r).text() + "</span>").html();
+		var id = $('cat', r).attr('id');
 		options[options.length] = new Option(name, id);
+
+		addAfter2( r, settings );
 	}
 
-	delAfter = function( r, settings ) {
-		var id = $('cat', r).attr('id'), o;
-		for ( o = 0; o < options.length; o++ )
+	var addAfter2 = function( x, r ) {
+		var t = $(r.parsed.responses[0].data);
+		if ( t.length == 1 )
+			inlineEditTax.addEvents($(t.id));
+	}
+
+	var delAfter = function( r, settings ) {
+		var id = $('cat', r).attr('id');
+		for ( var o = 0; o < options.length; o++ )
 			if ( id == options[o].value )
 				options[o] = null;
 	}
 
-	delBefore = function(s) {
-		if ( 'undefined' != showNotice )
-			return showNotice.warn() ? s : false;
-
-		return s;
-	}
-
 	if ( options )
-		$('#the-list').wpList( { addAfter: addAfter, delBefore: delBefore, delAfter: delAfter } );
+		$('#the-list').wpList( { addAfter: addAfter, delAfter: delAfter } );
 	else
-		$('#the-list').wpList({ delBefore: delBefore });
+		$('#the-list').wpList({ addAfter: addAfter2 });
 
-	$('.delete a[class^="delete"]').live('click', function(){return false;});
+	if ( jQuery('#link-category-search-input').size() ) {
+		columns.init('edit-link-categories');
+	} else {
+		columns.init('categories');
+	}
 });

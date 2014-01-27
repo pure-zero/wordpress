@@ -1,65 +1,57 @@
+
 (function($) {
 inlineEditPost = {
 
-	init : function(){
+	init : function() {
 		var t = this, qeRow = $('#inline-edit'), bulkRow = $('#bulk-edit');
 
-		t.type = $('table.widefat').hasClass('pages') ? 'page' : 'post';
-		t.what = '#post-';
+		t.type = $('table.widefat').hasClass('page') ? 'page' : 'post';
+		t.what = '#'+t.type+'-';
+
+		// get all editable rows
+		t.rows = $('tr.iedit');
 
 		// prepare the edit rows
-		qeRow.keyup(function(e){
-			if (e.which == 27)
-				return inlineEditPost.revert();
-		});
-		bulkRow.keyup(function(e){
-			if (e.which == 27)
-				return inlineEditPost.revert();
-		});
+		qeRow.keyup(function(e) { if(e.which == 27) return inlineEditPost.revert(); });
+		bulkRow.keyup(function(e) { if (e.which == 27) return inlineEditPost.revert(); });
 
-		$('a.cancel', qeRow).click(function(){
-			return inlineEditPost.revert();
-		});
-		$('a.save', qeRow).click(function(){
-			return inlineEditPost.save(this);
-		});
-		$('td', qeRow).keydown(function(e){
-			if ( e.which == 13 )
-				return inlineEditPost.save(this);
-		});
+		$('a.cancel', qeRow).click(function() { return inlineEditPost.revert(); });
+		$('a.save', qeRow).click(function() { return inlineEditPost.save(this); });
+		$('input, select', qeRow).keydown(function(e) { if(e.which == 13) return inlineEditPost.save(this); });
 
-		$('a.cancel', bulkRow).click(function(){
-			return inlineEditPost.revert();
-		});
+		$('a.cancel', bulkRow).click(function() { return inlineEditPost.revert(); });
 
-		$('#inline-edit .inline-edit-private input[value="private"]').click( function(){
+		$('#inline-edit .inline-edit-private input[value=private]').click( function(){
 			var pw = $('input.inline-edit-password-input');
-			if ( $(this).prop('checked') ) {
-				pw.val('').prop('disabled', true);
+			if ( $(this).attr('checked') ) {
+				pw.val('').attr('disabled', 'disabled');
 			} else {
-				pw.prop('disabled', false);
+				pw.attr('disabled', '');
 			}
 		});
 
 		// add events
-		$('a.editinline').live('click', function(){
-			inlineEditPost.edit(this);
-			return false;
-		});
+		t.addEvents(t.rows);
 
 		$('#bulk-title-div').parents('fieldset').after(
 			$('#inline-edit fieldset.inline-edit-categories').clone()
 		).siblings( 'fieldset:last' ).prepend(
+//		).siblings( 'fieldset:last' ).after( '<fieldset class="inline-edit-col-bottom"><div class="inline-edit-col"></div></fieldset>' );
+//		$('fieldset.inline-edit-col-bottom').prepend(
 			$('#inline-edit label.inline-edit-tags').clone()
 		);
 
-		// hiearchical taxonomies expandable?
-		$('span.catshow').click(function(){
-			$(this).hide().next().show().parent().next().addClass("cat-hover");
+		// categories expandable?
+		$('span.catshow').click(function() {
+			$('.inline-editor ul.cat-checklist').addClass("cat-hover");
+			$('.inline-editor span.cathide').show();
+			$(this).hide();
 		});
 
-		$('span.cathide').click(function(){
-			$(this).hide().prev().show().parent().next().removeClass("cat-hover");
+		$('span.cathide').click(function() {
+			$('.inline-editor ul.cat-checklist').removeClass("cat-hover");
+			$('.inline-editor span.catshow').show();
+			$(this).hide();
 		});
 
 		$('select[name="_status"] option[value="future"]', bulkRow).remove();
@@ -74,19 +66,28 @@ inlineEditPost = {
 			}
 		});
 
-		$('#post-query-submit').mousedown(function(e){
-			t.revert();
-			$('select[name^="action"]').val('-1');
+		$('#post-query-submit').click(function(e){
+			if ( $('form#posts-filter tr.inline-editor').length > 0 )
+				t.revert();
 		});
+
 	},
 
-	toggle : function(el){
+	toggle : function(el) {
 		var t = this;
+
 		$(t.what+t.getId(el)).css('display') == 'none' ? t.revert() : t.edit(el);
 	},
 
-	setBulk : function(){
-		var te = '', type = this.type, tax, c = true;
+	addEvents : function(r) {
+		r.each(function() {
+			var row = $(this);
+			$('a.editinline', row).click(function() { inlineEditPost.edit(this); return false; });
+		});
+	},
+
+	setBulk : function() {
+		var te = '', c = '', type = this.type;
 		this.revert();
 
 		$('#bulk-edit td').attr('colspan', $('.widefat:first thead th:visible').length);
@@ -94,47 +95,39 @@ inlineEditPost = {
 		$('#bulk-edit').addClass('inline-editor').show();
 
 		$('tbody th.check-column input[type="checkbox"]').each(function(i){
-			if ( $(this).prop('checked') ) {
-				c = false;
-				var id = $(this).val(), theTitle;
-				theTitle = $('#inline_'+id+' .post_title').html() || inlineEditL10n.notitle;
+			if ( $(this).attr('checked') ) {
+				var id = $(this).val();
+				var theTitle = $('#inline_'+id+' .post_title').text() || inlineEditL10n.notitle;
 				te += '<div id="ttle'+id+'"><a id="_'+id+'" class="ntdelbutton" title="'+inlineEditL10n.ntdeltitle+'">X</a>'+theTitle+'</div>';
 			}
 		});
 
-		if ( c )
-			return this.revert();
-
 		$('#bulk-titles').html(te);
-		$('#bulk-titles a').click(function(){
-			var id = $(this).attr('id').substr(1);
+		$('#bulk-titles a').click(function() {
+			var id = $(this).attr('id').substr(1), r = inlineEditPost.type+'-'+id;
 
-			$('table.widefat input[value="' + id + '"]').prop('checked', false);
+			$('table.widefat input[value="'+id+'"]').attr('checked', '');
 			$('#ttle'+id).remove();
 		});
 
 		// enable autocomplete for tags
-		if ( 'post' == type ) {
-			// support multi taxonomies?
-			tax = 'post_tag';
-			$('tr.inline-editor textarea[name="tax_input['+tax+']"]').suggest( ajaxurl + '?action=ajax-tag-search&tax=' + tax, { delay: 500, minchars: 2, multiple: true, multipleSep: inlineEditL10n.comma + ' ' } );
-		}
-		$('html, body').animate( { scrollTop: 0 }, 'fast' );
+		if ( type == 'post' )
+			$('tr.inline-editor textarea[name="tags_input"]').suggest( 'admin-ajax.php?action=ajax-tag-search', { delay: 500, minchars: 2, multiple: true, multipleSep: ", " } );
 	},
 
 	edit : function(id) {
-		var t = this, fields, editRow, rowData, status, pageOpt, pageLevel, nextPage, pageLoop = true, nextLevel, cur_format, f;
+		var t = this;
 		t.revert();
 
 		if ( typeof(id) == 'object' )
 			id = t.getId(id);
 
-		fields = ['post_title', 'post_name', 'post_author', '_status', 'jj', 'mm', 'aa', 'hh', 'mn', 'ss', 'post_password', 'post_format', 'menu_order'];
-		if ( t.type == 'page' )
-			fields.push('post_parent', 'page_template');
+		var fields = ['post_title', 'post_name', 'post_author', '_status', 'jj', 'mm', 'aa', 'hh', 'mn', 'ss', 'post_password'];
+		if ( t.type == 'page' ) fields.push('post_parent', 'menu_order', 'page_template');
+		if ( t.type == 'post' ) fields.push('tags_input');
 
 		// add the new blank row
-		editRow = $('#inline-edit').clone(true);
+		var editRow = $('#inline-edit').clone(true);
 		$('td', editRow).attr('colspan', $('.widefat:first thead th:visible').length);
 
 		if ( $(t.what+id).hasClass('alternate') )
@@ -142,79 +135,39 @@ inlineEditPost = {
 		$(t.what+id).hide().after(editRow);
 
 		// populate the data
-		rowData = $('#inline_'+id);
-		if ( !$(':input[name="post_author"] option[value="' + $('.post_author', rowData).text() + '"]', editRow).val() ) {
-			// author no longer has edit caps, so we need to add them to the list of authors
-			$(':input[name="post_author"]', editRow).prepend('<option value="' + $('.post_author', rowData).text() + '">' + $('#' + t.type + '-' + id + ' .author').text() + '</option>');
-		}
-		if ( $(':input[name="post_author"] option', editRow).length == 1 ) {
-			$('label.inline-edit-author', editRow).hide();
-		}
-
-		// hide unsupported formats, but leave the current format alone
-		cur_format = $('.post_format', rowData).text();
-		$('option.unsupported', editRow).each(function() {
-			var $this = $(this);
-			if ( $this.val() != cur_format )
-				$this.remove();
-		});
-
-		for ( f = 0; f < fields.length; f++ ) {
-			$(':input[name="' + fields[f] + '"]', editRow).val( $('.'+fields[f], rowData).text() );
+		var rowData = $('#inline_'+id);
+		for ( var f = 0; f < fields.length; f++ ) {
+			$(':input[name="'+fields[f]+'"]', editRow).val( $('.'+fields[f], rowData).text() );
 		}
 
 		if ( $('.comment_status', rowData).text() == 'open' )
-			$('input[name="comment_status"]', editRow).prop("checked", true);
+			$('input[name="comment_status"]', editRow).attr("checked", "checked");
 		if ( $('.ping_status', rowData).text() == 'open' )
-			$('input[name="ping_status"]', editRow).prop("checked", true);
+			$('input[name="ping_status"]', editRow).attr("checked", "checked");
 		if ( $('.sticky', rowData).text() == 'sticky' )
-			$('input[name="sticky"]', editRow).prop("checked", true);
+			$('input[name="sticky"]', editRow).attr("checked", "checked");
 
-		// hierarchical taxonomies
-		$('.post_category', rowData).each(function(){
-			var term_ids = $(this).text();
-
-			if ( term_ids ) {
-				taxname = $(this).attr('id').replace('_'+id, '');
-				$('ul.'+taxname+'-checklist :checkbox', editRow).val(term_ids.split(','));
-			}
-		});
-
-		//flat taxonomies
-		$('.tags_input', rowData).each(function(){
-			var terms = $(this).text(),
-				taxname = $(this).attr('id').replace('_' + id, ''),
-				textarea = $('textarea.tax_input_' + taxname, editRow),
-				comma = inlineEditL10n.comma;
-
-			if ( terms ) {
-				if ( ',' !== comma )
-					terms = terms.replace(/,/g, comma);
-				textarea.val(terms);
-			}
-
-			textarea.suggest( ajaxurl + '?action=ajax-tag-search&tax=' + taxname, { delay: 500, minchars: 2, multiple: true, multipleSep: inlineEditL10n.comma + ' ' } );
-		});
+		// categories
+		var cats;
+		if ( cats = $('.post_category', rowData).text() )
+			$('ul.cat-checklist :checkbox', editRow).val(cats.split(','));
 
 		// handle the post status
-		status = $('._status', rowData).text();
-		if ( 'future' != status )
-			$('select[name="_status"] option[value="future"]', editRow).remove();
-
-		if ( 'private' == status ) {
-			$('input[name="keep_private"]', editRow).prop("checked", true);
-			$('input.inline-edit-password-input').val('').prop('disabled', true);
+		var status = $('._status', rowData).text();
+		if ( status != 'future' ) $('select[name="_status"] option[value="future"]', editRow).remove();
+		if ( status == 'private' ) {
+			$('input[name="keep_private"]', editRow).attr("checked", "checked");
+			$('input.inline-edit-password-input').val('').attr('disabled', 'disabled');
 		}
 
 		// remove the current page and children from the parent dropdown
-		pageOpt = $('select[name="post_parent"] option[value="' + id + '"]', editRow);
+		var pageOpt = $('select[name="post_parent"] option[value="'+id+'"]', editRow);
 		if ( pageOpt.length > 0 ) {
-			pageLevel = pageOpt[0].className.split('-')[1];
-			nextPage = pageOpt;
+			var pageLevel = pageOpt[0].className.split('-')[1], nextPage = pageOpt, pageLoop = true;
 			while ( pageLoop ) {
-				nextPage = nextPage.next('option');
+				var nextPage = nextPage.next('option');
 				if (nextPage.length == 0) break;
-				nextLevel = nextPage[0].className.split('-')[1];
+				var nextLevel = nextPage[0].className.split('-')[1];
 				if ( nextLevel <= pageLevel ) {
 					pageLoop = false;
 				} else {
@@ -228,61 +181,71 @@ inlineEditPost = {
 		$(editRow).attr('id', 'edit-'+id).addClass('inline-editor').show();
 		$('.ptitle', editRow).focus();
 
+		// enable autocomplete for tags
+		if ( t.type == 'post' )
+			$('tr.inline-editor textarea[name="tags_input"]').suggest( 'admin-ajax.php?action=ajax-tag-search', { delay: 500, minchars: 2, multiple: true, multipleSep: ", " } );
+
 		return false;
 	},
 
 	save : function(id) {
-		var params, fields, page = $('.post_status_page').val() || '';
-
-		if ( typeof(id) == 'object' )
+		if( typeof(id) == 'object' )
 			id = this.getId(id);
 
-		$('table.widefat .spinner').show();
+		$('table.widefat .inline-edit-save .waiting').show();
 
-		params = {
+		var params = {
 			action: 'inline-save',
-			post_type: typenow,
+			post_type: this.type,
 			post_ID: id,
-			edit_date: 'true',
-			post_status: page
+			edit_date: 'true'
 		};
 
-		fields = $('#edit-'+id+' :input').serialize();
+		var fields = $('#edit-'+id+' :input').fieldSerialize();
 		params = fields + '&' + $.param(params);
 
 		// make ajax request
-		$.post( ajaxurl, params,
+		$.post('admin-ajax.php', params,
 			function(r) {
-				$('table.widefat .spinner').hide();
+				$('table.widefat .inline-edit-save .waiting').hide();
 
 				if (r) {
 					if ( -1 != r.indexOf('<tr') ) {
 						$(inlineEditPost.what+id).remove();
 						$('#edit-'+id).before(r).remove();
-						$(inlineEditPost.what+id).hide().fadeIn();
+
+						var row = $(inlineEditPost.what+id);
+						row.hide();
+
+						if ( 'draft' == $('input[name="post_status"]').val() )
+							row.find('td.column-comments').hide();
+
+						row.find('.hide-if-no-js').removeClass('hide-if-no-js');
+						inlineEditPost.addEvents(row);
+						row.fadeIn();
 					} else {
 						r = r.replace( /<.[^<>]*?>/g, '' );
-						$('#edit-'+id+' .inline-edit-save .error').html(r).show();
+						$('#edit-'+id+' .inline-edit-save').append('<span class="error">'+r+'</span>');
 					}
 				} else {
-					$('#edit-'+id+' .inline-edit-save .error').html(inlineEditL10n.error).show();
+					$('#edit-'+id+' .inline-edit-save').append('<span class="error">'+inlineEditL10n.error+'</span>');
 				}
 			}
 		, 'html');
 		return false;
 	},
 
-	revert : function(){
-		var id = $('table.widefat tr.inline-editor').attr('id');
+	revert : function() {
+		var id;
 
-		if ( id ) {
-			$('table.widefat .spinner').hide();
+		if ( id = $('table.widefat tr.inline-editor').attr('id') ) {
+			$('table.widefat .inline-edit-save .waiting').hide();
 
 			if ( 'bulk-edit' == id ) {
 				$('table.widefat #bulk-edit').removeClass('inline-editor').hide();
 				$('#bulk-titles').html('');
 				$('#inlineedit').append( $('#bulk-edit') );
-			} else {
+			} else  {
 				$('#'+id).remove();
 				id = id.substr( id.lastIndexOf('-') + 1 );
 				$(this.what+id).show();
@@ -293,8 +256,8 @@ inlineEditPost = {
 	},
 
 	getId : function(o) {
-		var id = $(o).closest('tr').attr('id'),
-			parts = id.split('-');
+		var id = o.tagName == 'TR' ? o.id : $(o).parents('tr').attr('id');
+		var parts = id.split('-');
 		return parts[parts.length - 1];
 	}
 };
