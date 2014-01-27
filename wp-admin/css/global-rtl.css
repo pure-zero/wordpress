@@ -78,5 +78,6 @@ body, td, textarea, input, select {
 
 .screen-reader-text, .screen-reader-text span {
 	left:auto;
-	text-indent:-1000em;
+	right:-1000em;
+}
 }

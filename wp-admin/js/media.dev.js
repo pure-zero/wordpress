@@ -31,7 +31,7 @@ var findPosts;
 				_ajax_nonce: $('#_ajax_nonce').val()
 			};
 
-			if ( $('#find-posts-pages').is(':checked') ) {
+			if ( $('#find-posts-pages:checked').val() ) {
 				post['pages'] = 1;
 			} else {
 				post['posts'] = 1;
