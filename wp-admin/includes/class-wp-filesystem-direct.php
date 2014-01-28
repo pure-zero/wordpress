@@ -1,19 +1,5 @@
 <?php
-/**
- * WordPress Direct Filesystem.
- *
- * @package WordPress
- * @subpackage Filesystem
- */
 
-/**
- * WordPress Filesystem Class for direct PHP file and folder manipulation.
- *
- * @since 2.5
- * @package WordPress
- * @subpackage Filesystem
- * @uses WP_Filesystem_Base Extends class
- */
 class WP_Filesystem_Direct  extends WP_Filesystem_Base {
 	var $permission = null;
 	var $errors = array();
@@ -232,9 +218,7 @@ class WP_Filesystem_Direct  extends WP_Filesystem_Base {
 			return false;
 
 		$ret = array();
-		$dir = @dir($path);
-		if ( ! $dir )
-			return false;
+		$dir = dir($path);
 		while (false !== ($entry = $dir->read()) ) {
 			$struc = array();
 			$struc['name'] = $entry;

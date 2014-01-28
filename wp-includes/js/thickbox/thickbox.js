@@ -281,9 +281,8 @@ function tb_remove() {
 }
 
 function tb_position() {
-var isIE6 = typeof document.body.style.maxHeight === "undefined";
 jQuery("#TB_window").css({marginLeft: '-' + parseInt((TB_WIDTH / 2),10) + 'px', width: TB_WIDTH + 'px'});
-	if ( ! isIE6 ) { // take away IE6
+	if ( !(jQuery.browser.msie && jQuery.browser.version < 7)) { // take away IE6
 		jQuery("#TB_window").css({marginTop: '-' + parseInt((TB_HEIGHT / 2),10) + 'px'});
 	}
 }
