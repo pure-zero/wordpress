@@ -1,6 +1,6 @@
 <?php
 /**
- * Template for displaying all pages
+ * The template for displaying all pages.
  *
  * This is the template that displays all pages by default.
  * Please note that this is the WordPress construct of pages
@@ -17,13 +17,11 @@ get_header(); ?>
 		<div id="primary">
 			<div id="content" role="main">
 
-				<?php while ( have_posts() ) : the_post(); ?>
+				<?php the_post(); ?>
 
-					<?php get_template_part( 'content', 'page' ); ?>
+				<?php get_template_part( 'content', 'page' ); ?>
 
-					<?php comments_template( '', true ); ?>
-
-				<?php endwhile; // end of the loop. ?>
+				<?php comments_template( '', true ); ?>
 
 			</div><!-- #content -->
 		</div><!-- #primary -->
