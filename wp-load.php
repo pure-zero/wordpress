@@ -26,9 +26,9 @@ if ( file_exists( ABSPATH . 'wp-config.php') ) {
 	/** The config file resides in ABSPATH */
 	require_once( ABSPATH . 'wp-config.php' );
 
-} elseif ( file_exists( dirname(ABSPATH) . '/wp-config.php' ) && ! file_exists( dirname(ABSPATH) . '/wp-settings.php' ) ) {
+} elseif ( file_exists( dirname(ABSPATH) . '/wp-config.php' ) ) {
 
-	/** The config file resides one level above ABSPATH but is not part of another install*/
+	/** The config file resides one level below ABSPATH */
 	require_once( dirname(ABSPATH) . '/wp-config.php' );
 
 } else {

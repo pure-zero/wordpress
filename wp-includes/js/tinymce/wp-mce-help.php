@@ -1,12 +1,4 @@
-<?php
-/**
- * @package TinyMCE
- * @author Moxiecode
- * @copyright Copyright © 2005-2006, Moxiecode Systems AB, All rights reserved.
- */
-
-/** @ignore */
-require_once('../../../wp-load.php');
+<?php require_once('../../../wp-load.php');
 header('Content-Type: text/html; charset=' . get_bloginfo('charset'));
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -14,8 +6,8 @@ header('Content-Type: text/html; charset=' . get_bloginfo('charset'));
 <head>
 <meta http-equiv="Content-Type" content="<?php bloginfo('html_type'); ?>; charset=<?php echo get_option('blog_charset'); ?>" />
 <title><?php _e('Rich Editor Help') ?></title>
-<script type="text/javascript" src="tiny_mce_popup.js?ver=321"></script>
-<?php
+<script type="text/javascript" src="tiny_mce_popup.js?ver=311"></script>
+<?php 
 wp_admin_css( 'global', true );
 wp_admin_css( 'wp-admin', true );
 ?>
@@ -23,46 +15,42 @@ wp_admin_css( 'wp-admin', true );
 	#wphead {
 		font-size: 80%;
 		border-top: 0;
-		color: #555;
-		background-color: #f1f1f1;
+		color:#555;
+		background-color: #e4f2fd;
 	}
 	#wphead h1 {
-		font-size: 24px;
+		font-size: 32px;
 		color: #555;
 		margin: 0;
 		padding: 10px;
 	}
-	#tabs {
-		padding: 15px 15px 3px;
-		background-color: #f1f1f1;
-		border-bottom: 1px solid #dfdfdf;
+	#adminmenu {
+		padding-top: 2px;
+		padding-left: 15px;
+		background-color: #e4f2fd;
+		border-color: #C6D9E9;
 	}
-	#tabs li {
-		display: inline;
-	}
-	#tabs a.current {
+	#adminmenu a.current {
 		background-color: #fff;
-		border-color: #dfdfdf;
+		border-color: #c6d9e9;
 		border-bottom-color: #fff;
 		color: #d54e21;
 	}
-	#tabs a {
+	#adminmenu a {
 		color: #2583AD;
 		padding: 6px;
-		border-width: 1px 1px 0;
+		border-width: 1px;
 		border-style: solid solid none;
-		border-color: #f1f1f1;
-		text-decoration: none;
+		border-color: #E4F2FD;
 	}
-	#tabs a:hover {
+	#adminmenu a:hover {
 		color: #d54e21;
 	}
 	.wrap h2 {
-		border-bottom-color: #dfdfdf;
-		color: #555;
-		margin: 5px 0;
+		border-bottom-color:#DADADA;
+		color:#666666;
+		margin: 12px 0;
 		padding: 0;
-		font-size: 18px;
 	}
 	#user_info {
 		right: 5%;
@@ -70,15 +58,15 @@ wp_admin_css( 'wp-admin', true );
 	}
 	h3 {
 		font-size: 1.1em;
-		margin-top: 10px;
+		margin-top: 20px;
 		margin-bottom: 0px;
 	}
 	#flipper {
 		margin: 0;
 		padding: 5px 20px 10px;
 		background-color: #fff;
-		border-left: 1px solid #dfdfdf;
-		border-bottom: 1px solid #dfdfdf;
+		border-left: 1px solid #c6d9e9;
+		border-bottom: 1px solid #c6d9e9;
 	}
 	* html {
         overflow-x: hidden;
@@ -97,7 +85,7 @@ wp_admin_css( 'wp-admin', true );
 	}
 	.top .key {
 		text-align: center;
-		width: 5em;
+		width: 36px;
 	}
 	.top .action {
 		text-align: left;
@@ -130,7 +118,7 @@ wp_admin_css( 'wp-admin', true );
 </style>
 <?php if ( ('rtl' == $wp_locale->text_direction) ) : ?>
 <style type="text/css">
-	#wphead, #tabs {
+	#wphead, #adminmenu {
 		padding-left: auto;
 		padding-right: 15px;
 	}
@@ -167,10 +155,10 @@ wp_admin_css( 'wp-admin', true );
 </script>
 </head>
 <body>
-
+<div class="zerosize"></div>
 <div id="wphead"><h1><?php echo get_bloginfo('blogtitle'); ?></h1></div>
 
-<ul id="tabs">
+<ul id="adminmenu">
 	<li><a id="tab1" href="javascript:flipTab(1)" title="<?php _e('Basics of Rich Editing') ?>" accesskey="1" tabindex="1" class="current"><?php _e('Basics') ?></a></li>
 	<li><a id="tab2" href="javascript:flipTab(2)" title="<?php _e('Advanced use of the Rich Editor') ?>" accesskey="2" tabindex="2"><?php _e('Advanced') ?></a></li>
 	<li><a id="tab3" href="javascript:flipTab(3)" title="<?php _e('Hotkeys') ?>" accesskey="3" tabindex="3"><?php _e('Hotkeys') ?></a></li>
@@ -216,7 +204,7 @@ wp_admin_css( 'wp-admin', true );
 			"<tr><th>6</th><td><?php _e('Header 6') ?></td><th>9</th><td><?php _e('Address') ?></td></tr>")
 		</script>
 	</table>
-
+	
 	<p><?php _e('The following shortcuts use different access keys: Alt + Shift + letter.') ?></p>
 	<table class="keys" width="100%" style="border: 0 none;">
 		<tr class="top"><th class="key center"><?php _e('Letter') ?></th><th class="left"><?php _e('Action') ?></th><th class="key center"><?php _e('Letter') ?></th><th class="left"><?php _e('Action') ?></th></tr>
