@@ -6,8 +6,6 @@
  * @subpackage Administration
  */
 
-define('WP_ADMIN', true);
-
 if ( defined('ABSPATH') )
 	require_once(ABSPATH . 'wp-load.php');
 else
@@ -30,9 +28,8 @@ if ( !current_user_can('upload_files') )
 if ( isset($_REQUEST['attachment_id']) && ($id = intval($_REQUEST['attachment_id'])) && $_REQUEST['fetch'] ) {
 	if ( 2 == $_REQUEST['fetch'] ) {
 		add_filter('attachment_fields_to_edit', 'media_single_attachment_fields_to_edit', 10, 2);
-		echo get_media_item($id, array( 'send' => false, 'delete' => true ));
+		echo get_media_item($id, array( 'send' => false, 'delete' => false ));
 	} else {
-		add_filter('attachment_fields_to_edit', 'media_post_single_attachment_fields_to_edit', 10, 2);
 		echo get_media_item($id);
 	}
 	exit;
@@ -42,7 +39,7 @@ check_admin_referer('media-form');
 
 $id = media_handle_upload('async-upload', $_REQUEST['post_id']);
 if (is_wp_error($id)) {
-	echo '<div id="media-upload-error">'.esc_html($id->get_error_message()).'</div>';
+	echo '<div id="media-upload-error">'.wp_specialchars($id->get_error_message()).'</div>';
 	exit;
 }
 

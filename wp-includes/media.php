@@ -200,10 +200,10 @@ function get_image_tag($id, $alt, $title, $align, $size='medium') {
 	list( $img_src, $width, $height ) = image_downsize($id, $size);
 	$hwstring = image_hwstring($width, $height);
 
-	$class = 'align' . esc_attr($align) .' size-' . esc_attr($size) . ' wp-image-' . $id;
+	$class = 'align'.attribute_escape($align).' size-'.attribute_escape($size).' wp-image-'.$id;
 	$class = apply_filters('get_image_tag_class', $class, $id, $align, $size);
 
-	$html = '<img src="' . esc_attr($img_src) . '" alt="' . esc_attr($alt) . '" title="' . esc_attr($title).'" '.$hwstring.'class="'.$class.'" />';
+	$html = '<img src="'.attribute_escape($img_src).'" alt="'.attribute_escape($alt).'" title="'.attribute_escape($title).'" '.$hwstring.'class="'.$class.'" />';
 
 	$html = apply_filters( 'get_image_tag', $html, $id, $alt, $title, $align, $size );
 
@@ -231,10 +231,10 @@ function wp_constrain_dimensions( $current_width, $current_height, $max_width=0,
 
 	$width_ratio = $height_ratio = 1.0;
 
-	if ( $max_width > 0 && $current_width > 0 && $current_width > $max_width )
+	if ( $max_width > 0 && $current_width > $max_width )
 		$width_ratio = $max_width / $current_width;
 
-	if ( $max_height > 0 && $current_height > 0 && $current_height > $max_height )
+	if ( $max_height > 0 && $current_height > $max_height )
 		$height_ratio = $max_height / $current_height;
 
 	// the smaller ratio is the one we need to fit it to the constraining box
@@ -378,7 +378,7 @@ function image_resize( $file, $max_w, $max_h, $crop=false, $suffix=null, $dest_p
 	else {
 		// all other formats are converted to jpg
 		$destfilename = "{$dir}/{$name}-{$suffix}.jpg";
-		if (!imagejpeg( $newimage, $destfilename, apply_filters( 'jpeg_quality', $jpeg_quality, 'image_resize' ) ) )
+		if (!imagejpeg( $newimage, $destfilename, apply_filters( 'jpeg_quality', $jpeg_quality ) ) )
 			return new WP_Error('resize_path_invalid', __( 'Resize path invalid' ));
 	}
 
@@ -503,8 +503,6 @@ function wp_get_attachment_image_src($attachment_id, $size='thumbnail', $icon = 
 	if ( $image = image_downsize($attachment_id, $size) )
 		return $image;
 
-	$src = false;
-
 	if ( $icon && $src = wp_mime_type_icon($attachment_id) ) {
 		$icon_dir = apply_filters( 'icon_dir', ABSPATH . WPINC . '/images/crystal' );
 		$src_file = $icon_dir . '/' . basename($src);
@@ -516,10 +514,9 @@ function wp_get_attachment_image_src($attachment_id, $size='thumbnail', $icon = 
 }
 
 /**
- * Get an HTML img element representing an image attachment
+ * Retrieve img HTML content for an image to represent an attachment.
  *
- * @uses apply_filters() Calls 'wp_get_attachment_image_attributes' hook on attributes array
- * @uses wp_get_attachment_image_src() Gets attachment file URL and dimensions
+ * @see wp_get_attachment_image_src() Returns img HTML element based on array.
  * @since 2.5.0
  *
  * @param int $attachment_id Image attachment ID.
@@ -536,20 +533,7 @@ function wp_get_attachment_image($attachment_id, $size = 'thumbnail', $icon = fa
 		$hwstring = image_hwstring($width, $height);
 		if ( is_array($size) )
 			$size = join('x', $size);
-		$attachment =& get_post($attachment_id);
-		$attr = array(
-			'src'	=> $src,
-			'class'	=> "attachment-$size",
-			'alt'	=> trim(strip_tags( $attachment->post_excerpt )),
-			'title'	=> trim(strip_tags( $attachment->post_title )),
-			);
-		$attr = apply_filters( 'wp_get_attachment_image_attributes', $attr, $attachment );
-		$attr = array_map( 'esc_attr', $attr );
-		$html = rtrim("<img $hwstring");
-		foreach ( $attr as $name => $value ) {
-			$html .= " $name=" . '"' . $value . '"';
-		}
-		$html .= ' />';
+		$html = '<img src="'.attribute_escape($src).'" '.$hwstring.'class="attachment-'.attribute_escape($size).'" alt="" />';
 	}
 
 	return $html;
@@ -591,10 +575,10 @@ function img_caption_shortcode($attr, $content = null) {
 	if ( 1 > (int) $width || empty($caption) )
 		return $content;
 
-	if ( $id ) $id = 'id="' . esc_attr($id) . '" ';
+	if ( $id ) $id = 'id="' . $id . '" ';
 
-	return '<div ' . $id . 'class="wp-caption ' . esc_attr($align) . '" style="width: ' . (10 + (int) $width) . 'px">'
-	. do_shortcode( $content ) . '<p class="wp-caption-text">' . $caption . '</p></div>';
+	return '<div ' . $id . 'class="wp-caption ' . $align . '" style="width: ' . (10 + (int) $width) . 'px">'
+	. $content . '<p class="wp-caption-text">' . $caption . '</p></div>';
 }
 
 add_shortcode('gallery', 'gallery_shortcode');
@@ -612,9 +596,6 @@ add_shortcode('gallery', 'gallery_shortcode');
  */
 function gallery_shortcode($attr) {
 	global $post;
-
-	static $instance = 0;
-	$instance++;
 
 	// Allow plugins/themes to override the default gallery template.
 	$output = apply_filters('post_gallery', '', $attr);
@@ -647,8 +628,8 @@ function gallery_shortcode($attr) {
 
 	if ( is_feed() ) {
 		$output = "\n";
-		foreach ( $attachments as $att_id => $attachment )
-			$output .= wp_get_attachment_link($att_id, $size, true) . "\n";
+		foreach ( $attachments as $id => $attachment )
+			$output .= wp_get_attachment_link($id, $size, true) . "\n";
 		return $output;
 	}
 
@@ -657,27 +638,25 @@ function gallery_shortcode($attr) {
 	$columns = intval($columns);
 	$itemwidth = $columns > 0 ? floor(100/$columns) : 100;
 
-	$selector = "gallery-{$instance}";
-
 	$output = apply_filters('gallery_style', "
 		<style type='text/css'>
-			#{$selector} {
+			.gallery {
 				margin: auto;
 			}
-			#{$selector} .gallery-item {
+			.gallery-item {
 				float: left;
 				margin-top: 10px;
 				text-align: center;
 				width: {$itemwidth}%;			}
-			#{$selector} img {
+			.gallery img {
 				border: 2px solid #cfcfcf;
 			}
-			#{$selector} .gallery-caption {
+			.gallery-caption {
 				margin-left: 0;
 			}
 		</style>
 		<!-- see gallery_shortcode() in wp-includes/media.php -->
-		<div id='$selector' class='gallery galleryid-{$id}'>");
+		<div class='gallery'>");
 
 	$i = 0;
 	foreach ( $attachments as $id => $attachment ) {
@@ -691,7 +670,7 @@ function gallery_shortcode($attr) {
 		if ( $captiontag && trim($attachment->post_excerpt) ) {
 			$output .= "
 				<{$captiontag} class='gallery-caption'>
-				" . wptexturize($attachment->post_excerpt) . "
+				{$attachment->post_excerpt}
 				</{$captiontag}>";
 		}
 		$output .= "</{$itemtag}>";
@@ -710,24 +689,18 @@ function gallery_shortcode($attr) {
  * Display previous image link that has the same post parent.
  *
  * @since 2.5.0
- * @param string $size Optional, default is 'thumbnail'. Size of image, either array or string. 0 or 'none' will default to post_title or $text;
- * @param string $text Optional, default is false. If included, link will reflect $text variable.
- * @return string HTML content.
  */
-function previous_image_link($size = 'thumbnail', $text = false) {
-	adjacent_image_link(true, $size, $text);
+function previous_image_link() {
+	adjacent_image_link(true);
 }
 
 /**
  * Display next image link that has the same post parent.
  *
  * @since 2.5.0
- * @param string $size Optional, default is 'thumbnail'. Size of image, either array or string. 0 or 'none' will default to post_title or $text;
- * @param string $text Optional, default is false. If included, link will reflect $text variable.
- * @return string HTML content.
  */
-function next_image_link($size = 'thumbnail', $text = false) {
-	adjacent_image_link(false, $size, $text);
+function next_image_link() {
+	adjacent_image_link(false);
 }
 
 /**
@@ -739,7 +712,7 @@ function next_image_link($size = 'thumbnail', $text = false) {
  *
  * @param bool $prev Optional. Default is true to display previous link, true for next.
  */
-function adjacent_image_link($prev = true, $size = 'thumbnail', $text = false) {
+function adjacent_image_link($prev = true) {
 	global $post;
 	$post = get_post($post);
 	$attachments = array_values(get_children( array('post_parent' => $post->post_parent, 'post_status' => 'inherit', 'post_type' => 'attachment', 'post_mime_type' => 'image', 'order' => 'ASC', 'orderby' => 'menu_order ID') ));
@@ -751,7 +724,7 @@ function adjacent_image_link($prev = true, $size = 'thumbnail', $text = false) {
 	$k = $prev ? $k - 1 : $k + 1;
 
 	if ( isset($attachments[$k]) )
-		echo wp_get_attachment_link($attachments[$k]->ID, $size, true, false, $text);
+		echo wp_get_attachment_link($attachments[$k]->ID, 'thumbnail', true);
 }
 
 /**
