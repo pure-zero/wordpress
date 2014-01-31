@@ -173,6 +173,21 @@ function get_cat_ID( $cat_name='General' ) {
 
 
 /**
+ * Retrieve the category name by the category ID.
+ *
+ * @since 0.71
+ * @deprecated Use get_cat_name()
+ * @see get_cat_name() get_catname() is deprecated in favor of get_cat_name().
+ *
+ * @param int $cat_ID Category ID
+ * @return string category name
+ */
+function get_catname( $cat_ID ) {
+	return get_cat_name( $cat_ID );
+}
+
+
+/**
  * Retrieve the name of a category from its ID.
  *
  * @since 1.0.0
@@ -200,13 +215,14 @@ function get_cat_name( $cat_id ) {
  * @return bool Whether $cat2 is child of $cat1
  */
 function cat_is_ancestor_of( $cat1, $cat2 ) {
-	if ( ! isset($cat1->term_id) )
+	if ( is_int( $cat1 ) )
 		$cat1 = &get_category( $cat1 );
-	if ( ! isset($cat2->parent) )
+	if ( is_int( $cat2 ) )
 		$cat2 = &get_category( $cat2 );
 
-	if ( empty($cat1->term_id) || empty($cat2->parent) )
+	if ( !$cat1->term_id || !$cat2->parent )
 		return false;
+
 	if ( $cat2->parent == $cat1->term_id )
 		return true;
 
