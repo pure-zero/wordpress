@@ -1,5 +1,20 @@
 <?php
+/**
+ * RSS Importer
+ *
+ * @package WordPress
+ * @subpackage Importer
+ */
 
+/**
+ * RSS Importer
+ *
+ * Will process a RSS feed for importing posts into WordPress. This is a very
+ * limited importer and should only be used as the last resort, when no other
+ * importer is available.
+ *
+ * @since unknown
+ */
 class RSS_Import {
 
 	var $posts = array ();
@@ -7,6 +22,7 @@ class RSS_Import {
 
 	function header() {
 		echo '<div class="wrap">';
+		screen_icon();
 		echo '<h2>'.__('Import RSS').'</h2>';
 	}
 
@@ -71,7 +87,7 @@ class RSS_Import {
 				$cat_index++;
 			}
 
-			preg_match('|<guid.+?>(.*?)</guid>|is', $post, $guid);
+			preg_match('|<guid.*?>(.*?)</guid>|is', $post, $guid);
 			if ($guid)
 				$guid = $wpdb->escape(trim($guid[1]));
 			else
@@ -87,7 +103,7 @@ class RSS_Import {
 			}
 
 			// Clean up content
-			$post_content = preg_replace('|<(/?[A-Z]+)|e', "'<' . strtolower('$1')", $post_content);
+			$post_content = preg_replace_callback('|<(/?[A-Z]+)|', create_function('$match', 'return "<" . strtolower($match[1]);'), $post_content);
 			$post_content = str_replace('<br>', '<br />', $post_content);
 			$post_content = str_replace('<hr>', '<hr />', $post_content);
 
@@ -113,7 +129,7 @@ class RSS_Import {
 				if ( is_wp_error( $post_id ) )
 					return $post_id;
 				if (!$post_id) {
-					_e("Couldn't get post ID");
+					_e('Couldn&#8217;t get post ID');
 					return;
 				}
 
@@ -141,6 +157,7 @@ class RSS_Import {
 		if ( is_wp_error( $result ) )
 			return $result;
 		wp_import_cleanup($file['id']);
+		do_action('import_done', 'rss');
 
 		echo '<h3>';
 		printf(__('All done. <a href="%s">Have fun!</a>'), get_option('home'));
@@ -177,5 +194,5 @@ class RSS_Import {
 
 $rss_import = new RSS_Import();
 
-register_importer('rss', __('RSS'), __('Import posts from an RSS feed'), array ($rss_import, 'dispatch'));
+register_importer('rss', __('RSS'), __('Import posts from an RSS feed.'), array ($rss_import, 'dispatch'));
 ?>

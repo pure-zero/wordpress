@@ -1,26 +1,66 @@
 <?php
+/**
+ * Blogger Importer
+ *
+ * @package WordPress
+ * @subpackage Importer
+ */
 
-define( 'MAX_RESULTS',        50 ); // How many records per GData query
-define( 'MAX_EXECUTION_TIME', 20 ); // How many seconds to let the script run
-define( 'STATUS_INTERVAL',     3 ); // How many seconds between status bar updates
+/**
+ * How many records per GData query
+ *
+ * @package WordPress
+ * @subpackage Blogger_Import
+ * @var int
+ * @since unknown
+ */
+define( 'MAX_RESULTS',        50 );
 
+/**
+ * How many seconds to let the script run
+ *
+ * @package WordPress
+ * @subpackage Blogger_Import
+ * @var int
+ * @since unknown
+ */
+define( 'MAX_EXECUTION_TIME', 20 );
+
+/**
+ * How many seconds between status bar updates
+ *
+ * @package WordPress
+ * @subpackage Blogger_Import
+ * @var int
+ * @since unknown
+ */
+define( 'STATUS_INTERVAL',     3 );
+
+/**
+ * Blogger Importer class
+ *
+ * @since unknown
+ */
 class Blogger_Import {
 
 	// Shows the welcome screen and the magic auth link.
 	function greet() {
-		$next_url = get_option('siteurl') . '/wp-admin/index.php?import=blogger&noheader=true';
+		$next_url = get_option('siteurl') . '/wp-admin/index.php?import=blogger&amp;noheader=true';
 		$auth_url = "https://www.google.com/accounts/AuthSubRequest";
 		$title = __('Import Blogger');
 		$welcome = __('Howdy! This importer allows you to import posts and comments from your Blogger account into your WordPress blog.');
-		$prereqs = __('To use this importer, you must have a Google account, an upgraded (New, was Beta) blog, and it must be on blogspot or a custom domain (not FTP).');
+		$prereqs = __('To use this importer, you must have a Google account and an upgraded (New, was Beta) blog hosted on blogspot.com or a custom domain (not FTP).');
 		$stepone = __('The first thing you need to do is tell Blogger to let WordPress access your account. You will be sent back here after providing authorization.');
-		$auth = __('Authorize');
+		$auth = esc_attr__('Authorize');
 
 		echo "
-		<div class='wrap'><h2>$title</h2><p>$welcome</p><p>$prereqs</p><p>$stepone</p>
+		<div class='wrap'>
+		".screen_icon()."
+		<h2>$title</h2>
+		<p>$welcome</p><p>$prereqs</p><p>$stepone</p>
 			<form action='$auth_url' method='get'>
 				<p class='submit' style='text-align:left;'>
-					<input type='submit' value='$auth' />
+					<input type='submit' class='button' value='$auth' />
 					<input type='hidden' name='scope' value='http://www.blogger.com/feeds/' />
 					<input type='hidden' name='session' value='1' />
 					<input type='hidden' name='secure' value='0' />
@@ -31,7 +71,9 @@ class Blogger_Import {
 	}
 
 	function uh_oh($title, $message, $info) {
-		echo "<div class='wrap'><h2>$title</h2><p>$message</p><pre>$info</pre></div>";
+		echo "<div class='wrap'>";
+		screen_icon();
+		echo "<h2>$title</h2><p>$message</p><pre>$info</pre></div>";
 	}
 
 	function auth() {
@@ -148,20 +190,20 @@ class Blogger_Import {
 			}
 		}
 //echo '<pre>'.print_r($this,1).'</pre>';
-		$start    = js_escape( __('Import') );
-		$continue = js_escape( __('Continue') );
-		$stop     = js_escape( __('Importing...') );
-		$authors  = js_escape( __('Set Authors') );
-		$loadauth = js_escape( __('Preparing author mapping form...') );
-		$authhead = js_escape( __('Final Step: Author Mapping') );
-		$nothing  = js_escape( __('Nothing was imported. Had you already imported this blog?') );
+		$start    = esc_js( __('Import') );
+		$continue = esc_js( __('Continue') );
+		$stop     = esc_js( __('Importing...') );
+		$authors  = esc_js( __('Set Authors') );
+		$loadauth = esc_js( __('Preparing author mapping form...') );
+		$authhead = esc_js( __('Final Step: Author Mapping') );
+		$nothing  = esc_js( __('Nothing was imported. Had you already imported this blog?') );
 		$title    = __('Blogger Blogs');
 		$name     = __('Blog Name');
 		$url      = __('Blog URL');
 		$action   = __('The Magic Button');
 		$posts    = __('Posts');
 		$comments = __('Comments');
-		$noscript = __('This feature requires Javascript but it seems to be disabled. Please enable Javascript and then reload this page. Don\'t worry, you can turn it back off when you\'re done.');
+		$noscript = __('This feature requires Javascript but it seems to be disabled. Please enable Javascript and then reload this page. Don&#8217;t worry, you can turn it back off when you&#8217;re done.');
 
 		$interval = STATUS_INTERVAL * 1000;
 
@@ -172,18 +214,20 @@ class Blogger_Import {
 				$value = $continue;
 			else
 				$value = $authors;
-			$blogtitle = js_escape( $blog['title'] );
+			$value = esc_attr($value);
+			$blogtitle = esc_js( $blog['title'] );
 			$pdone = isset($blog['posts_done']) ? (int) $blog['posts_done'] : 0;
 			$cdone = isset($blog['comments_done']) ? (int) $blog['comments_done'] : 0;
 			$init .= "blogs[$i]=new blog($i,'$blogtitle','{$blog['mode']}'," . $this->get_js_status($i) . ');';
 			$pstat = "<div class='ind' id='pind$i'>&nbsp;</div><div id='pstat$i' class='stat'>$pdone/{$blog['total_posts']}</div>";
 			$cstat = "<div class='ind' id='cind$i'>&nbsp;</div><div id='cstat$i' class='stat'>$cdone/{$blog['total_comments']}</div>";
-			$rows .= "<tr id='blog$i'><td class='blogtitle'>$blogtitle</td><td class='bloghost'>{$blog['host']}</td><td class='bar'>$pstat</td><td class='bar'>$cstat</td><td class='submit'><input type='submit' id='submit$i' value='$value' /><input type='hidden' name='blog' value='$i' /></td></tr>\n";
+			$rows .= "<tr id='blog$i'><td class='blogtitle'>$blogtitle</td><td class='bloghost'>{$blog['host']}</td><td class='bar'>$pstat</td><td class='bar'>$cstat</td><td class='submit'><input type='submit' class='button' id='submit$i' value='$value' /><input type='hidden' name='blog' value='$i' /></td></tr>\n";
 		}
 
-		echo "<div class='wrap'><h2>$title</h2><noscript>$noscript</noscript><table cellpadding='5px'><thead><td>$name</td><td>$url</td><td>$posts</td><td>$comments</td><td>$action</td></thead>\n$rows</table></form></div>";
+		echo "<div class='wrap'><h2>$title</h2><noscript>$noscript</noscript><table cellpadding='5px'><thead><tr><td>$name</td><td>$url</td><td>$posts</td><td>$comments</td><td>$action</td></tr></thead>\n$rows</table></div>";
 		echo "
 		<script type='text/javascript'>
+		/* <![CDATA[ */
 			var strings = {cont:'$continue',stop:'$stop',stopping:'$stopping',authors:'$authors',nothing:'$nothing'};
 			var blogs = {};
 			function blog(i, title, mode, status){
@@ -296,6 +340,7 @@ class Blogger_Import {
 			};
 			$init
 			jQuery.each(blogs, function(i, me){me.init();});
+		/* ]]> */
 		</script>\n";
 	}
 
@@ -381,7 +426,7 @@ class Blogger_Import {
 						$AtomParser = new AtomParser();
 						$AtomParser->parse( $entry );
 						$result = $this->import_post($AtomParser->entry);
-						if ( is_wp_error( $result ) ) 
+						if ( is_wp_error( $result ) )
 							return $result;
 						unset($AtomParser);
 					}
@@ -393,7 +438,7 @@ class Blogger_Import {
 				if ( count( $matches[1] ) )
 					foreach ( $matches[1] as $match )
 						if ( preg_match('/rel=.previous./', $match) )
-							$query = html_entity_decode( preg_replace('/^.*href=[\'"].*\?(.+)[\'"].*$/', '$1', $match) );
+							$query = @html_entity_decode( preg_replace('/^.*href=[\'"].*\?(.+)[\'"].*$/', '$1', $match), ENT_COMPAT, get_option('blog_charset') );
 
 				if ( $query ) {
 					parse_str($query, $q);
@@ -451,7 +496,7 @@ class Blogger_Import {
 				if ( count( $matches[1] ) )
 					foreach ( $matches[1] as $match )
 						if ( preg_match('/rel=.previous./', $match) )
-							$query = html_entity_decode( preg_replace('/^.*href=[\'"].*\?(.+)[\'"].*$/', '$1', $match) );
+							$query = @html_entity_decode( preg_replace('/^.*href=[\'"].*\?(.+)[\'"].*$/', '$1', $match), ENT_COMPAT, get_option('blog_charset') );
 
 				parse_str($query, $q);
 
@@ -485,7 +530,7 @@ class Blogger_Import {
 	}
 
 	function import_post( $entry ) {
-		global $wpdb, $importing_blog;
+		global $importing_blog;
 
 		// The old permalink is all Blogger gives us to link comments to their posts.
 		if ( isset( $entry->draft ) )
@@ -501,12 +546,12 @@ class Blogger_Import {
 		}
 
 		$post_date    = $this->convert_date( $entry->published );
-		$post_content = trim( addslashes( $this->no_apos( html_entity_decode( $entry->content ) ) ) );
+		$post_content = trim( addslashes( $this->no_apos( @html_entity_decode( $entry->content, ENT_COMPAT, get_option('blog_charset') ) ) ) );
 		$post_title   = trim( addslashes( $this->no_apos( $this->min_whitespace( $entry->title ) ) ) );
 		$post_status  = isset( $entry->draft ) ? 'draft' : 'publish';
 
 		// Clean up content
-		$post_content = preg_replace('|<(/?[A-Z]+)|e', "'<' . strtolower('$1')", $post_content);
+		$post_content = preg_replace_callback('|<(/?[A-Z]+)|', create_function('$match', 'return "<" . strtolower($match[1]);'), $post_content);
 		$post_content = str_replace('<br>', '<br />', $post_content);
 		$post_content = str_replace('<hr>', '<hr />', $post_content);
 
@@ -520,7 +565,7 @@ class Blogger_Import {
 			$post = compact('post_date', 'post_content', 'post_title', 'post_status');
 
 			$post_id = wp_insert_post($post);
-			if ( is_wp_error( $post_id ) ) 
+			if ( is_wp_error( $post_id ) )
 				return $post_id;
 
 			wp_create_categories( array_map( 'addslashes', $entry->categories ), $post_id );
@@ -556,10 +601,10 @@ class Blogger_Import {
 		$comment_author  = addslashes( $this->no_apos( strip_tags( (string) $matches[1] ) ) );
 		$comment_author_url = addslashes( $this->no_apos( strip_tags( (string) $matches[2] ) ) );
 		$comment_date    = $this->convert_date( $entry->updated );
-		$comment_content = addslashes( $this->no_apos( html_entity_decode( $entry->content ) ) );
+		$comment_content = addslashes( $this->no_apos( @html_entity_decode( $entry->content, ENT_COMPAT, get_option('blog_charset') ) ) );
 
 		// Clean up content
-		$comment_content = preg_replace('|<(/?[A-Z]+)|e', "'<' . strtolower('$1')", $comment_content);
+		$comment_content = preg_replace_callback('|<(/?[A-Z]+)|', create_function('$match', 'return "<" . strtolower($match[1]);'), $comment_content);
 		$comment_content = str_replace('<br>', '<br />', $comment_content);
 		$comment_content = str_replace('<hr>', '<hr />', $comment_content);
 
@@ -608,21 +653,21 @@ class Blogger_Import {
 			$this->save_vars();
 		}
 
-		$directions = __('All posts were imported with the current user as author. Use this form to move each Blogger user\'s posts to a different WordPress user. You may <a href="users.php">add users</a> and then return to this page and complete the user mapping. This form may be used as many times as you like until you activate the "Restart" function below.');
+		$directions = __('All posts were imported with the current user as author. Use this form to move each Blogger user&#8217;s posts to a different WordPress user. You may <a href="users.php">add users</a> and then return to this page and complete the user mapping. This form may be used as many times as you like until you activate the &#8220;Restart&#8221; function below.');
 		$heading = __('Author mapping');
 		$blogtitle = "{$blog['title']} ({$blog['host']})";
 		$mapthis = __('Blogger username');
 		$tothis = __('WordPress login');
-		$submit = js_escape( __('Save Changes &raquo;') );
+		$submit = esc_js( __('Save Changes') );
 
 		foreach ( $blog['authors'] as $i => $author )
 			$rows .= "<tr><td><label for='authors[$i]'>{$author[0]}</label></td><td><select name='authors[$i]' id='authors[$i]'>" . $this->get_user_options($author[1]) . "</select></td></tr>";
 
-		return "<div class='wrap'><h2>$heading</h2><h3>$blogtitle</h3><p>$directions</p><form action='index.php?import=blogger&noheader=true&saveauthors=1' method='post'><input type='hidden' name='blog' value='$importing_blog' /><table cellpadding='5'><thead><td>$mapthis</td><td>$tothis</td></thead>$rows<tr><td></td><td class='submit'><input type='submit' class='authorsubmit' value='$submit' /></td></tr></table></form></div>";
+		return "<div class='wrap'><h2>$heading</h2><h3>$blogtitle</h3><p>$directions</p><form action='index.php?import=blogger&amp;noheader=true&saveauthors=1' method='post'><input type='hidden' name='blog' value='" . esc_attr($importing_blog) . "' /><table cellpadding='5'><thead><td>$mapthis</td><td>$tothis</td></thead>$rows<tr><td></td><td class='submit'><input type='submit' class='button authorsubmit' value='$submit' /></td></tr></table></form></div>";
 	}
 
 	function get_user_options($current) {
-		global $wpdb, $importer_users;
+		global $importer_users;
 		if ( ! isset( $importer_users ) )
 			$importer_users = (array) get_users_of_blog();
 
@@ -641,7 +686,7 @@ class Blogger_Import {
 		$host = $this->blogs[$importing_blog]['host'];
 
 		// Get an array of posts => authors
-		$post_ids = (array) $wpdb->get_col("SELECT post_id FROM $wpdb->postmeta WHERE meta_key = 'blogger_blog' AND meta_value = '$host'");
+		$post_ids = (array) $wpdb->get_col( $wpdb->prepare("SELECT post_id FROM $wpdb->postmeta WHERE meta_key = 'blogger_blog' AND meta_value = %s", $host) );
 		$post_ids = join( ',', $post_ids );
 		$results = (array) $wpdb->get_results("SELECT post_id, meta_value FROM $wpdb->postmeta WHERE meta_key = 'blogger_author' AND post_id IN ($post_ids)");
 		foreach ( $results as $row )
@@ -658,7 +703,7 @@ class Blogger_Import {
 			$post_ids = (array) array_keys( $authors_posts, $this->blogs[$importing_blog]['authors'][$author][0] );
 			$post_ids = join( ',', $post_ids);
 
-			$wpdb->query("UPDATE $wpdb->posts SET post_author = $user_id WHERE id IN ($post_ids)");
+			$wpdb->query( $wpdb->prepare("UPDATE $wpdb->posts SET post_author = %d WHERE id IN ($post_ids)", $user_id) );
 			$this->blogs[$importing_blog]['authors'][$author][1] = $user_id;
 		}
 		$this->save_vars();
@@ -751,7 +796,7 @@ class Blogger_Import {
 		$blog = (int) $_GET['blog'];
 		echo '<h1>'.__('Congratulations!').'</h1><p>'.__('Now that you have imported your Blogger blog into WordPress, what are you going to do? Here are some suggestions:').'</p><ul><li>'.__('That was hard work! Take a break.').'</li>';
 		if ( count($this->import['blogs']) > 1 )
-			echo '<li>'.__('In case you haven\'t done it already, you can import the posts from your other blogs:'). $this->show_blogs() . '</li>';
+			echo '<li>'.__('In case you haven&#8217;t done it already, you can import the posts from your other blogs:'). $this->show_blogs() . '</li>';
 		if ( $n = count($this->import['blogs'][$blog]['newusers']) )
 			echo '<li>'.sprintf(__('Go to <a href="%s" target="%s">Authors &amp; Users</a>, where you can modify the new user(s) or delete them. If you want to make all of the imported posts yours, you will be given that option when you delete the new authors.'), 'users.php', '_parent').'</li>';
 		echo '<li>'.__('For security, click the link below to reset this importer.').'</li>';
@@ -770,14 +815,14 @@ class Blogger_Import {
 				$this->$key = $value;
 
 		if ( isset( $_REQUEST['blog'] ) ) {
-			$blog = is_array($_REQUEST['blog']) ? array_shift( array_keys( $_REQUEST['blog'] ) ) : $_REQUEST['blog'];
+			$blog = is_array($_REQUEST['blog']) ? array_shift( $keys = array_keys( $_REQUEST['blog'] ) ) : $_REQUEST['blog'];
 			$blog = (int) $blog;
 			$result = $this->import_blog( $blog );
 			if ( is_wp_error( $result ) )
 				echo $result->get_error_message();
 		} elseif ( isset($_GET['token']) )
 			$this->auth();
-		elseif ( $this->token && $this->token_is_valid() )
+		elseif ( isset($this->token) && $this->token_is_valid() )
 			$this->show_blogs();
 		else
 			$this->greet();
@@ -787,8 +832,8 @@ class Blogger_Import {
 		if ( $saved && !isset($_GET['noheader']) ) {
 			$restart = __('Restart');
 			$message = __('We have saved some information about your Blogger account in your WordPress database. Clearing this information will allow you to start over. Restarting will not affect any posts you have already imported. If you attempt to re-import a blog, duplicate posts and comments will be skipped.');
-			$submit = __('Clear account information');
-			echo "<div class='wrap'><h2>$restart</h2><p>$message</p><form method='post' action='?import=blogger&noheader=true'><p class='submit' style='text-align:left;'><input type='submit' value='$submit' name='restart' /></p></form></div>";
+			$submit = esc_attr__('Clear account information');
+			echo "<div class='wrap'><h2>$restart</h2><p>$message</p><form method='post' action='?import=blogger&amp;noheader=true'><p class='submit' style='text-align:left;'><input type='submit' class='button' value='$submit' name='restart' /></p></form></div>";
 		}
 	}
 
@@ -821,9 +866,6 @@ thead td { font-weight: bold; }
 	position: relative;
 	text-align: center;
 }
-.submit {
-	text-align: center !important;
-}
 </style>
 <?php
 	}
@@ -840,7 +882,7 @@ thead td { font-weight: bold; }
 
 $blogger_import = new Blogger_Import();
 
-register_importer('blogger', __('Blogger'), __('Import posts, comments, and users from a Blogger blog'), array ($blogger_import, 'start'));
+register_importer('blogger', __('Blogger'), __('Import posts, comments, and users from a Blogger blog.'), array ($blogger_import, 'start'));
 
 class AtomEntry {
 	var $links = array();
