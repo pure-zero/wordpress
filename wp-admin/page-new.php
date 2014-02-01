@@ -1,31 +1,30 @@
 <?php
-/**
- * New page administration panel.
- *
- * @package WordPress
- * @subpackage Administration
- */
-
-/** WordPress Administration Bootstrap */
 require_once('admin.php');
-$title = __('Add New Page');
-$parent_file = 'edit-pages.php';
-$editing = true;
-wp_enqueue_script('autosave');
-wp_enqueue_script('post');
-if ( user_can_richedit() )
-	wp_enqueue_script('editor');
-add_thickbox();
-wp_enqueue_script('media-upload');
-wp_enqueue_script('word-count');
+$title = __('New Page');
+$parent_file = 'post.php';
+require_once('admin-header.php');
 
-if ( current_user_can('edit_pages') ) {
+get_currentuserinfo();
+?>
+
+<?php if ( isset($_GET['saved']) ) : ?>
+<div class="updated"><p><strong><?php _e('Page saved.') ?> <a href="edit-pages.php"><?php _e('Manage pages'); ?> &raquo;</a></strong></p></div>
+<?php endif; ?>
+
+<?php
+if ($user_level > 0) {
 	$action = 'post';
-	$post = get_default_page_to_edit();
+	get_currentuserinfo();
+	//set defaults
+	$post_status = 'static';
+	$comment_status = get_settings('default_comment_status');
+	$ping_status = get_settings('default_ping_status');
+	$post_pingback = get_settings('default_pingback_flag');
+	$post_parent = 0;
+	$page_template = 'default';
 
 	include('edit-page-form.php');
 }
-
-include('admin-footer.php');
-
 ?>
+
+<?php include('admin-footer.php'); ?> 
