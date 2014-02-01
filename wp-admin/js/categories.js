@@ -1,1 +1,16 @@
-jQuery(document).ready(function(d){var b=false,e,c,a;if(document.forms.addcat.category_parent){b=document.forms.addcat.category_parent.options}e=function(h,g){var f,i;f=d("<span>"+d("name",h).text()+"</span>").text();i=d("cat",h).attr("id");b[b.length]=new Option(f,i)};a=function(g,f){var i=d("cat",g).attr("id"),h;for(h=0;h<b.length;h++){if(i==b[h].value){b[h]=null}}};c=function(f){if("undefined"!=showNotice){return showNotice.warn()?f:false}return f};if(b){d("#the-list").wpList({addAfter:e,delBefore:c,delAfter:a})}else{d("#the-list").wpList({delBefore:c})}d('.delete a[class^="delete"]').live("click",function(){return false})});
+addLoadEvent(function() {
+	if (!theList.theList) return false;
+	document.forms.addcat.submit.onclick = function(e) {return killSubmit('theList.ajaxAdder("cat", "addcat");', e); };
+	theList.addComplete = function(what, where, update, transport) {
+		var name = getNodeValue(transport.responseXML, 'name').unescapeHTML();
+		var id = transport.responseXML.getElementsByTagName(what)[0].getAttribute('id');
+		var options = document.forms['addcat'].category_parent.options;
+		options[options.length] = new Option(name, id);
+	};
+	theList.delComplete = function(what, id) {
+		var options = document.forms['addcat'].category_parent.options;
+		for ( var o = 0; o < options.length; o++ )
+			if ( id == options[o].value )
+				options[o] = null;
+	};
+});
