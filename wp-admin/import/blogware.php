@@ -1,13 +1,27 @@
 <?php
+/**
+ * Blogware XML Importer
+ *
+ * @package WordPress
+ * @subpackage Importer
+ * @author Shayne Sweeney
+ * @link http://www.theshayne.com/
+ */
 
-/* By Shayne Sweeney - http://www.theshayne.com/ */
-
+/**
+ * Blogware XML Importer class
+ *
+ * Extract posts from Blogware XML export file into your blog.
+ *
+ * @since unknown
+ */
 class BW_Import {
 
 	var $file;
 
 	function header() {
 		echo '<div class="wrap">';
+		screen_icon();
 		echo '<h2>'.__('Import Blogware').'</h2>';
 	}
 
@@ -26,6 +40,10 @@ class BW_Import {
 		echo '<p>'.__('Howdy! This importer allows you to extract posts from Blogware XML export file into your blog.  Pick a Blogware file to upload and click Import.').'</p>';
 		wp_import_upload_form("admin.php?import=blogware&amp;step=1");
 		echo '</div>';
+	}
+
+	function _normalize_tag( $matches ) {
+		return '<' . strtolower( $matches[1] );
 	}
 
 	function import_posts() {
@@ -75,7 +93,7 @@ class BW_Import {
 			}
 
 			// Clean up content
-			$post_content = preg_replace('|<(/?[A-Z]+)|e', "'<' . strtolower('$1')", $post_content);
+			$post_content = preg_replace_callback('|<(/?[A-Z]+)|', array( &$this, '_normalize_tag' ), $post_content);
 			$post_content = str_replace('<br>', '<br />', $post_content);
 			$post_content = str_replace('<hr>', '<hr />', $post_content);
 			$post_content = $wpdb->escape($post_content);
@@ -86,16 +104,16 @@ class BW_Import {
 
 			echo '<li>';
 			if ($post_id = post_exists($post_title, $post_content, $post_date)) {
-				printf(__('Post <i>%s</i> already exists.'), stripslashes($post_title));
+				printf(__('Post <em>%s</em> already exists.'), stripslashes($post_title));
 			} else {
-				printf(__('Importing post <i>%s</i>...'), stripslashes($post_title));
+				printf(__('Importing post <em>%s</em>...'), stripslashes($post_title));
 				$postdata = compact('post_author', 'post_date', 'post_content', 'post_title', 'post_status');
 				$post_id = wp_insert_post($postdata);
 				if ( is_wp_error( $post_id ) ) {
 					return $post_id;
 				}
 				if (!$post_id) {
-					_e("Couldn't get post ID");
+					_e('Couldn&#8217;t get post ID');
 					echo '</li>';
 					break;
 				}
@@ -115,7 +133,7 @@ class BW_Import {
 					$comment_content = $this->unhtmlentities($comment_content);
 
 					// Clean up content
-					$comment_content = preg_replace('|<(/?[A-Z]+)|e', "'<' . strtolower('$1')", $comment_content);
+					$comment_content = preg_replace_callback('|<(/?[A-Z]+)|', array( &$this, '_normalize_tag' ), $comment_content);
 					$comment_content = str_replace('<br>', '<br />', $comment_content);
 					$comment_content = str_replace('<hr>', '<hr />', $comment_content);
 					$comment_content = $wpdb->escape($comment_content);
@@ -141,7 +159,7 @@ class BW_Import {
 			}
 			if ( $num_comments ) {
 				echo ' ';
-				printf(__('(%s comments)'), $num_comments);
+				printf( _n('%s comment', '%s comments', $num_comments), $num_comments );
 			}
 			echo '</li>';
 			flush();
@@ -162,7 +180,7 @@ class BW_Import {
 		if ( is_wp_error( $result ) )
 			return $result;
 		wp_import_cleanup($file['id']);
-
+		do_action('import_done', 'blogware');
 		echo '<h3>';
 		printf(__('All done. <a href="%s">Have fun!</a>'), get_option('home'));
 		echo '</h3>';
@@ -197,5 +215,5 @@ class BW_Import {
 
 $blogware_import = new BW_Import();
 
-register_importer('blogware', __('Blogware'), __('Import posts from Blogware'), array ($blogware_import, 'dispatch'));
+register_importer('blogware', __('Blogware'), __('Import posts from Blogware.'), array ($blogware_import, 'dispatch'));
 ?>

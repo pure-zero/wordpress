@@ -1,7 +1,18 @@
 <?php
+/**
+ * Miscellaneous settings administration panel.
+ *
+ * @package WordPress
+ * @subpackage Administration
+ */
+
+/** WordPress Administration Bootstrap */
 require_once('admin.php');
 
-$title = __('Miscellaneous Options');
+if ( ! current_user_can('manage_options') )
+	wp_die(__('You do not have sufficient permissions to manage options for this blog.'));
+
+$title = __('Miscellaneous Settings');
 $parent_file = 'options-general.php';
 
 include('admin-header.php');
@@ -9,43 +20,58 @@ include('admin-header.php');
 ?>
 
 <div class="wrap">
-<h2><?php _e('Miscellaneous Options') ?></h2>
+<?php screen_icon(); ?>
+<h2><?php echo esc_html( $title ); ?></h2>
+
 <form method="post" action="options.php">
-<?php wp_nonce_field('update-options') ?>
-<p class="submit"><input type="submit" name="Submit" value="<?php _e('Update Options &raquo;') ?>" /></p>
-<fieldset class="options">
-<legend><?php _e('Uploading'); ?></legend>
-<table class="editform optiontable">
+<?php settings_fields('misc'); ?>
+
+<h3><?php _e('Uploading Files'); ?></h3>
+<table class="form-table">
 <tr valign="top">
-<th scope="row"><?php _e('Store uploads in this folder'); ?>:</th>
-<td><input name="upload_path" type="text" id="upload_path" class="code" value="<?php echo attribute_escape(str_replace(ABSPATH, '', get_option('upload_path'))); ?>" size="40" />
-<br />
-<?php _e('Default is <code>wp-content/uploads</code>'); ?>
+<th scope="row"><label for="upload_path"><?php _e('Store uploads in this folder'); ?></label></th>
+<td><input name="upload_path" type="text" id="upload_path" value="<?php echo esc_attr(get_option('upload_path')); ?>" class="regular-text code" />
+<span class="description"><?php _e('Default is <code>wp-content/uploads</code>'); ?></span>
 </td>
 </tr>
+
+<tr valign="top">
+<th scope="row"><label for="upload_url_path"><?php _e('Full URL path to files'); ?></label></th>
+<td><input name="upload_url_path" type="text" id="upload_url_path" value="<?php echo esc_attr( get_option('upload_url_path')); ?>" class="regular-text code" />
+<span class="description"><?php _e('Configuring this is optional. By default, it should be blank.'); ?></span>
+</td>
+</tr>
+
 <tr>
-<td></td>
-<td>
+<th scope="row" colspan="2" class="th-full">
 <label for="uploads_use_yearmonth_folders">
-<input name="uploads_use_yearmonth_folders" type="checkbox" id="uploads_use_yearmonth_folders" value="1" <?php checked('1', get_option('uploads_use_yearmonth_folders')); ?> />
+<input name="uploads_use_yearmonth_folders" type="checkbox" id="uploads_use_yearmonth_folders" value="1"<?php checked('1', get_option('uploads_use_yearmonth_folders')); ?> />
 <?php _e('Organize my uploads into month- and year-based folders'); ?>
 </label>
-</td>
+</th>
 </tr>
+<?php do_settings_fields('misc', 'default'); ?>
 </table>
-</fieldset>
 
-<p><input name="use_linksupdate" type="checkbox" id="use_linksupdate" value="1" <?php checked('1', get_option('use_linksupdate')); ?> />
-<label for="use_linksupdate"><?php _e('Track Links&#8217; Update Times') ?></label></p>
-<p>
-<label><input type="checkbox" name="hack_file" value="1" <?php checked('1', get_option('hack_file')); ?> /> <?php _e('Use legacy <code>my-hacks.php</code> file support') ?></label>
-</p>
+<table class="form-table">
+
+<tr>
+<th scope="row" class="th-full">
+<label for="use_linksupdate">
+<input name="use_linksupdate" type="checkbox" id="use_linksupdate" value="1"<?php checked('1', get_option('use_linksupdate')); ?> />
+<?php _e('Track Links&#8217; Update Times') ?>
+</label>
+</th>
+</tr>
+
+</table>
+
+<?php do_settings_sections('misc'); ?>
 
 <p class="submit">
-<input type="hidden" name="action" value="update" />
-<input type="hidden" name="page_options" value="hack_file,use_linksupdate,uploads_use_yearmonth_folders,upload_path" />
-<input type="submit" name="Submit" value="<?php _e('Update Options &raquo;') ?>" />
+	<input type="submit" name="Submit" class="button-primary" value="<?php esc_attr_e('Save Changes') ?>" />
 </p>
+
 </form>
 </div>
 
