@@ -1,7 +1,7 @@
 <?php
 require_once('admin.php');
 
-$title = __('Settings');
+$title = __('Options');
 $this_file = 'options.php';
 $parent_file = 'options-general.php';
 
@@ -44,11 +44,12 @@ default:
 	include('admin-header.php'); ?>
 
 <div class="wrap">
-  <h2><?php _e('All Settings'); ?></h2>
+  <h2><?php _e('All Options'); ?></h2>
   <form name="form" action="options.php" method="post" id="all-options">
   <?php wp_nonce_field('update-options') ?>
   <input type="hidden" name="action" value="update" />
-  <table class="form-table">
+	<p class="submit"><input type="submit" name="Update" value="<?php _e('Update Options &raquo;') ?>" /></p>
+  <table width="98%">
 <?php
 $options = $wpdb->get_results("SELECT * FROM $wpdb->options ORDER BY option_name");
 
@@ -73,7 +74,7 @@ foreach ( (array) $options as $option) :
 	}
 	echo "
 <tr>
-	<th scope='row'>$option->option_name</th>
+	<th scope='row'><label for='$option->option_name'>$option->option_name</label></th>
 <td>";
 
 	if (strpos($value, "\n") !== false) echo "<textarea class='$class' name='$option->option_name' id='$option->option_name' cols='30' rows='5'>" . wp_specialchars($value) . "</textarea>";
@@ -85,7 +86,7 @@ endforeach;
 ?>
   </table>
 <?php $options_to_update = implode(',', $options_to_update); ?>
-<p class="submit"><input type="hidden" name="page_options" value="<?php echo $options_to_update; ?>" /><input type="submit" name="Update" value="<?php _e('Save Changes') ?>" /></p>
+<p class="submit"><input type="hidden" name="page_options" value="<?php echo $options_to_update; ?>" /><input type="submit" name="Update" value="<?php _e('Update Options &raquo;') ?>" /></p>
   </form>
 </div>
 
