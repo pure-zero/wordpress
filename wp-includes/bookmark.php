@@ -7,54 +7,39 @@
  */
 
 /**
- * Retrieve Bookmark data
+ * Retrieve Bookmark data based on ID
  *
- * @since 2.1.0
+ * @since 2.1
  * @uses $wpdb Database Object
  *
- * @param mixed $bookmark
+ * @param int $bookmark_id
  * @param string $output Optional. Either OBJECT, ARRAY_N, or ARRAY_A constant
  * @param string $filter Optional, default is 'raw'.
  * @return array|object Type returned depends on $output value.
  */
-function get_bookmark($bookmark, $output = OBJECT, $filter = 'raw') {
+function get_bookmark($bookmark_id, $output = OBJECT, $filter = 'raw') {
 	global $wpdb;
 
-	if ( empty($bookmark) ) {
-		if ( isset($GLOBALS['link']) )
-			$_bookmark = & $GLOBALS['link'];
-		else
-			$_bookmark = null;
-	} elseif ( is_object($bookmark) ) {
-		wp_cache_add($bookmark->link_id, $bookmark, 'bookmark');
-		$_bookmark = $bookmark;
-	} else {
-		if ( isset($GLOBALS['link']) && ($GLOBALS['link']->link_id == $bookmark) ) {
-			$_bookmark = & $GLOBALS['link'];
-		} elseif ( ! $_bookmark = wp_cache_get($bookmark, 'bookmark') ) {
-			$_bookmark = $wpdb->get_row($wpdb->prepare("SELECT * FROM $wpdb->links WHERE link_id = %d LIMIT 1", $bookmark));
-			$_bookmark->link_category = array_unique( wp_get_object_terms($_bookmark->link_id, 'link_category', array('fields' => 'ids')) );
-			wp_cache_add($_bookmark->link_id, $_bookmark, 'bookmark');
-		}
-	}
+	$link = $wpdb->get_row($wpdb->prepare("SELECT * FROM $wpdb->links WHERE link_id = %d LIMIT 1", $bookmark_id));
+	$link->link_category = array_unique( wp_get_object_terms($link->link_id, 'link_category', 'fields=ids') );
 
-	$_bookmark = sanitize_bookmark($_bookmark, $filter);
+	$link = sanitize_bookmark($link, $filter);
 
 	if ( $output == OBJECT ) {
-		return $_bookmark;
+		return $link;
 	} elseif ( $output == ARRAY_A ) {
-		return get_object_vars($_bookmark);
+		return get_object_vars($link);
 	} elseif ( $output == ARRAY_N ) {
-		return array_values(get_object_vars($_bookmark));
+		return array_values(get_object_vars($link));
 	} else {
-		return $_bookmark;
+		return $link;
 	}
 }
 
 /**
  * Retrieve single bookmark data item or field.
  *
- * @since 2.3.0
+ * @since 2.3
  * @uses get_bookmark() Gets bookmark object using $bookmark as ID
  * @uses sanitize_bookmark_field() Sanitizes Bookmark field based on $context.
  *
@@ -77,6 +62,21 @@ function get_bookmark_field( $field, $bookmark, $context = 'display' ) {
 		return '';
 
 	return sanitize_bookmark_field($field, $bookmark->$field, $bookmark->link_id, $context);
+}
+
+/**
+ * Retrieve bookmark data based on ID.
+ *
+ * @since 2.0
+ * @deprecated Use get_bookmark()
+ * @see get_bookmark()
+ *
+ * @param int $bookmark_id ID of link
+ * @param string $output Either OBJECT, ARRAY_N, or ARRAY_A
+ * @return object|array
+ */
+function get_link($bookmark_id, $output = OBJECT, $filter = 'raw') {
+	return get_bookmark($bookmark_id, $output, $filter);
 }
 
 /**
@@ -106,7 +106,7 @@ function get_bookmark_field( $field, $bookmark, $context = 'display' ) {
  * 'exclude' - Default is empty string (string). Exclude other categories
  *		separated by commas.
  *
- * @since 2.1.0
+ * @since 2.1
  * @uses $wpdb Database Object
  * @link http://codex.wordpress.org/Template_Tags/get_bookmarks
  *
@@ -127,15 +127,10 @@ function get_bookmarks($args = '') {
 	$r = wp_parse_args( $args, $defaults );
 	extract( $r, EXTR_SKIP );
 
-	$cache = array();
 	$key = md5( serialize( $r ) );
-	if ( $cache = wp_cache_get( 'get_bookmarks', 'bookmark' ) ) {
-		if ( is_array($cache) && isset( $cache[ $key ] ) )
+	if ( $cache = wp_cache_get( 'get_bookmarks', 'bookmark' ) )
+		if ( isset( $cache[ $key ] ) )
 			return apply_filters('get_bookmarks', $cache[ $key ], $r );
-	}
-
-	if ( !is_array($cache) )
-		$cache = array();
 
 	$inclusions = '';
 	if ( !empty($include) ) {
@@ -170,14 +165,9 @@ function get_bookmarks($args = '') {
 	if (!empty($exclusions))
 		$exclusions .= ')';
 
-	if ( !empty($category_name) ) {
-		if ( $category = get_term_by('name', $category_name, 'link_category') ) {
+	if ( ! empty($category_name) ) {
+		if ( $category = get_term_by('name', $category_name, 'link_category') )
 			$category = $category->term_id;
-		} else {
-			$cache[ $key ] = array();
-			wp_cache_set( 'get_bookmarks', $cache, 'bookmark' );
-			return apply_filters( 'get_bookmarks', array(), $r );
-		}
 	}
 
 	if ( ! empty($search) ) {
@@ -203,7 +193,7 @@ function get_bookmarks($args = '') {
 		$join = " INNER JOIN $wpdb->term_relationships AS tr ON ($wpdb->links.link_id = tr.object_id) INNER JOIN $wpdb->term_taxonomy as tt ON tt.term_taxonomy_id = tr.term_taxonomy_id";
 	}
 
-	if ( $show_updated && get_option('links_recently_updated_time') ) {
+	if (get_option('links_recently_updated_time')) {
 		$recently_updated_test = ", IF (DATE_ADD(link_updated, INTERVAL " . get_option('links_recently_updated_time') . " MINUTE) >= NOW(), 1,0) as recently_updated ";
 	} else {
 		$recently_updated_test = '';
@@ -213,32 +203,19 @@ function get_bookmarks($args = '') {
 
 	$orderby = strtolower($orderby);
 	$length = '';
-	switch ( $orderby ) {
+	switch ($orderby) {
 		case 'length':
 			$length = ", CHAR_LENGTH(link_name) AS length";
 			break;
 		case 'rand':
 			$orderby = 'rand()';
 			break;
-		case 'link_id':
-			$orderby = "$wpdb->links.link_id";
-			break;
 		default:
-			$orderparams = array();
-			foreach ( explode(',', $orderby) as $ordparam ) {
-				$ordparam = trim($ordparam);
-				if ( in_array( $ordparam, array( 'name', 'url', 'visible', 'rating', 'owner', 'updated' ) ) )
-					$orderparams[] = 'link_' . $ordparam;
-			}
-			$orderby = implode(',', $orderparams);
+			$orderby = "link_" . $orderby;
 	}
 
-	if ( empty( $orderby ) )
-		$orderby = 'link_name';
-
-	$order = strtoupper( $order );
-	if ( '' !== $order && !in_array( $order, array( 'ASC', 'DESC' ) ) )
-		$order = 'ASC';
+	if ( 'link_id' == $orderby )
+		$orderby = "$wpdb->links.link_id";
 
 	$visible = '';
 	if ( $hide_invisible )
@@ -261,7 +238,7 @@ function get_bookmarks($args = '') {
 /**
  * Sanitizes all bookmark fields
  *
- * @since 2.3.0
+ * @since 2.3
  *
  * @param object|array $bookmark Bookmark row
  * @param string $context Optional, default is 'display'. How to filter the
@@ -273,22 +250,15 @@ function sanitize_bookmark($bookmark, $context = 'display') {
 		'link_description', 'link_visible', 'link_owner', 'link_rating', 'link_updated',
 		'link_rel', 'link_notes', 'link_rss', );
 
-	if ( is_object($bookmark) ) {
+	$do_object = false;
+	if ( is_object($bookmark) )
 		$do_object = true;
-		$link_id = $bookmark->link_id;
-	} else {
-		$do_object = false;
-		$link_id = $bookmark['link_id'];
-	}
 
 	foreach ( $fields as $field ) {
-		if ( $do_object ) {
-			if ( isset($bookmark->$field) )
-				$bookmark->$field = sanitize_bookmark_field($field, $bookmark->$field, $link_id, $context);
-		} else {
-			if ( isset($bookmark[$field]) )
-				$bookmark[$field] = sanitize_bookmark_field($field, $bookmark[$field], $link_id, $context);
-		}
+		if ( $do_object )
+			$bookmark->$field = sanitize_bookmark_field($field, $bookmark->$field, $bookmark->link_id, $context);
+		else
+			$bookmark[$field] = sanitize_bookmark_field($field, $bookmark[$field], $bookmark['link_id'], $context);
 	}
 
 	return $bookmark;
@@ -309,7 +279,7 @@ function sanitize_bookmark($bookmark, $context = 'display') {
  * $field has the filter name and is passed the $value, $bookmark_id, and
  * $context respectively.
  *
- * @since 2.3.0
+ * @since 2.3
  *
  * @param string $field The bookmark field
  * @param mixed $value The bookmark field value
@@ -319,62 +289,58 @@ function sanitize_bookmark($bookmark, $context = 'display') {
  * @return mixed The filtered value
  */
 function sanitize_bookmark_field($field, $value, $bookmark_id, $context) {
-	switch ( $field ) {
-	case 'link_id' : // ints
-	case 'link_rating' :
+	$int_fields = array('link_id', 'link_rating');
+	if ( in_array($field, $int_fields) )
 		$value = (int) $value;
-		break;
-	case 'link_category' : // array( ints )
-		$value = array_map('absint', (array) $value);
-		// We return here so that the categories aren't filtered.
-		// The 'link_category' filter is for the name of a link category, not an array of a link's link categories
-		return $value;
-		break;
-	case 'link_visible' : // bool stored as Y|N
+
+	$yesno = array('link_visible');
+	if ( in_array($field, $yesno) )
 		$value = preg_replace('/[^YNyn]/', '', $value);
-		break;
-	case 'link_target' : // "enum"
+
+	if ( 'link_target' == $field ) {
 		$targets = array('_top', '_blank');
 		if ( ! in_array($value, $targets) )
 			$value = '';
-		break;
 	}
 
 	if ( 'raw' == $context )
 		return $value;
 
 	if ( 'edit' == $context ) {
+		$format_to_edit = array('link_notes');
 		$value = apply_filters("edit_$field", $value, $bookmark_id);
 
-		if ( 'link_notes' == $field ) {
-			$value = esc_html( $value ); // textarea_escaped
+		if ( in_array($field, $format_to_edit) ) {
+			$value = format_to_edit($value);
 		} else {
-			$value = esc_attr($value);
+			$value = attribute_escape($value);
 		}
 	} else if ( 'db' == $context ) {
 		$value = apply_filters("pre_$field", $value);
 	} else {
 		// Use display filters by default.
 		$value = apply_filters($field, $value, $bookmark_id, $context);
-
-		if ( 'attribute' == $context )
-			$value = esc_attr($value);
-		else if ( 'js' == $context )
-			$value = esc_js($value);
 	}
+
+	if ( 'attribute' == $context )
+		$value = attribute_escape($value);
+	else if ( 'js' == $context )
+		$value = js_escape($value);
 
 	return $value;
 }
 
 /**
- * Deletes bookmark cache
+ * Deletes entire bookmark cache
  *
- * @since 2.7.0
+ * @since 2.1
  * @uses wp_cache_delete() Deletes the contents of 'get_bookmarks'
  */
-function clean_bookmark_cache($bookmark_id) {
-	wp_cache_delete( $bookmark_id, 'bookmark' );
+function delete_get_bookmark_cache() {
 	wp_cache_delete( 'get_bookmarks', 'bookmark' );
 }
+add_action( 'add_link', 'delete_get_bookmark_cache' );
+add_action( 'edit_link', 'delete_get_bookmark_cache' );
+add_action( 'delete_link', 'delete_get_bookmark_cache' );
 
 ?>

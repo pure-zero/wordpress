@@ -76,7 +76,7 @@ var ImageDialog = {
 			});
 		} else
 			args.style = this.styleVal;
-
+		
 		tinymce.extend(args, {
 			src : f.src.value,
 			alt : f.alt.value,
@@ -160,8 +160,8 @@ var ImageDialog = {
 			}
 
 			// Merge
-			st = tinyMCEPopup.dom.parseStyle(dom.serializeStyle(st), 'img');
-			this.styleVal = dom.serializeStyle(st, 'img');
+			st = tinyMCEPopup.dom.parseStyle(dom.serializeStyle(st));
+			this.styleVal = dom.serializeStyle(st);
 		}
 	},
 

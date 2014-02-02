@@ -6,7 +6,7 @@
  * @package WordPress
  */
 
-/** Make sure that the WordPress bootstrap has run before continuing. */
+/** Make sure that the WordPress bootstrap has ran before continuing. */
 require( dirname(__FILE__) . '/wp-load.php');
 
 if ( get_magic_quotes_gpc() )
@@ -16,5 +16,4 @@ if ( get_magic_quotes_gpc() )
 setcookie('wp-postpass_' . COOKIEHASH, $_POST['post_password'], time() + 864000, COOKIEPATH);
 
 wp_safe_redirect(wp_get_referer());
-exit;
 ?>

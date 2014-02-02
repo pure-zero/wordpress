@@ -48,7 +48,7 @@ $shortcode_tags = array();
  * There can only be one hook for each shortcode. Which means that if another
  * plugin has a similar shortcode, it will override yours or yours will override
  * theirs depending on which order the plugins are included and/or ran.
- *
+ * 
  * Simplest example of a shortcode tag using the API:
  *
  * <code>
@@ -157,14 +157,6 @@ function do_shortcode($content) {
  * The regular expression combines the shortcode tags in the regular expression
  * in a regex class.
  *
- * The regular expresion contains 6 different sub matches to help with parsing.
- *
- * 1/6 - An extra [ or ] to allow for escaping shortcodes with double [[]]
- * 2 - The shortcode name
- * 3 - The shortcode argument list
- * 4 - The self closing /
- * 5 - The content of a shortcode when it wraps some content.
- *
  * @since 2.5
  * @uses $shortcode_tags
  *
@@ -175,13 +167,11 @@ function get_shortcode_regex() {
 	$tagnames = array_keys($shortcode_tags);
 	$tagregexp = join( '|', array_map('preg_quote', $tagnames) );
 
-	// WARNING! Do not change this regex without changing do_shortcode_tag() and strip_shortcodes()
-	return '(.?)\[('.$tagregexp.')\b(.*?)(?:(\/))?\](?:(.+?)\[\/\2\])?(.?)';
+	return '\[('.$tagregexp.')\b(.*?)(?:(\/))?\](?:(.+?)\[\/\1\])?';
 }
 
 /**
  * Regular Expression callable for do_shortcode() for calling shortcode hook.
- * @see get_shortcode_regex for details of the match array contents.
  *
  * @since 2.5
  * @access private
@@ -190,23 +180,18 @@ function get_shortcode_regex() {
  * @param array $m Regular expression match array
  * @return mixed False on failure.
  */
-function do_shortcode_tag( $m ) {
+function do_shortcode_tag($m) {
 	global $shortcode_tags;
 
-	// allow [[foo]] syntax for escaping a tag
-	if ( $m[1] == '[' && $m[6] == ']' ) {
-		return substr($m[0], 1, -1);
-	}
+	$tag = $m[1];
+	$attr = shortcode_parse_atts($m[2]);
 
-	$tag = $m[2];
-	$attr = shortcode_parse_atts( $m[3] );
-
-	if ( isset( $m[5] ) ) {
+	if ( isset($m[4]) ) {
 		// enclosing tag - extra parameter
-		return $m[1] . call_user_func( $shortcode_tags[$tag], $attr, $m[5], $tag ) . $m[6];
+		return call_user_func($shortcode_tags[$tag], $attr, $m[4]);
 	} else {
 		// self-closing tag
-		return $m[1] . call_user_func( $shortcode_tags[$tag], $attr, NULL,  $tag ) . $m[6];
+		return call_user_func($shortcode_tags[$tag], $attr);
 	}
 }
 
@@ -219,7 +204,7 @@ function do_shortcode_tag( $m ) {
  *
  * @since 2.5
  *
- * @param string $text
+ * @param string $text 
  * @return array List of attributes and their value.
  */
 function shortcode_parse_atts($text) {
@@ -290,9 +275,9 @@ function strip_shortcodes( $content ) {
 
 	$pattern = get_shortcode_regex();
 
-	return preg_replace('/'.$pattern.'/s', '$1$6', $content);
+	return preg_replace('/'.$pattern.'/s', '', $content);
 }
 
-add_filter('the_content', 'do_shortcode', 11); // AFTER wpautop()
+add_filter('the_content', 'do_shortcode', 11); // AFTER wpautop() 
 
 ?>
