@@ -1,30 +1,29 @@
 <?php
 require_once('admin.php');
 $title = __('New Page');
-$parent_file = 'post.php';
-require_once('admin-header.php');
+$parent_file = 'post-new.php';
+$editing = true;
+wp_enqueue_script('autosave');
+wp_enqueue_script('page');
+if ( user_can_richedit() )
+	wp_enqueue_script('editor');
+wp_enqueue_script('thickbox');
+wp_enqueue_script('media-upload');
 
-get_currentuserinfo();
+require_once('admin-header.php');
 ?>
 
-<?php if ( isset($_GET['saved']) ) : ?>
-<div class="updated"><p><strong><?php _e('Page saved.') ?> <a href="edit-pages.php"><?php _e('Manage pages'); ?> &raquo;</a></strong></p></div>
+<?php if ( (isset($_GET['posted']) && $_GET['posted'])  || isset($_GET['saved'])  ) : ?>
+<div id="message" class="updated fade"><p><strong><?php _e('Page saved.') ?></strong> <a href="edit-pages.php"><?php _e('Manage pages'); ?></a> | <a href="<?php echo get_page_link( isset($_GET['posted']) ? $_GET['posted'] : $_GET['saved'] ); ?>"><?php _e('View page') ; ?></a></p></div>
 <?php endif; ?>
 
 <?php
-if ($user_level > 0) {
+if ( current_user_can('edit_pages') ) {
 	$action = 'post';
-	get_currentuserinfo();
-	//set defaults
-	$post_status = 'static';
-	$comment_status = get_settings('default_comment_status');
-	$ping_status = get_settings('default_ping_status');
-	$post_pingback = get_settings('default_pingback_flag');
-	$post_parent = 0;
-	$page_template = 'default';
+	$post = get_default_page_to_edit();
 
 	include('edit-page-form.php');
 }
 ?>
 
-<?php include('admin-footer.php'); ?> 
+<?php include('admin-footer.php'); ?>

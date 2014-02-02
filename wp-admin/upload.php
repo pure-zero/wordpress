@@ -1,230 +1,249 @@
 <?php
 require_once('admin.php');
 
-$title = 'Upload Image or File';
+if (!current_user_can('upload_files'))
+	wp_die(__('You do not have permission to upload files.'));
+
+// Handle bulk deletes
+if ( isset($_GET['deleteit']) && isset($_GET['delete']) ) {
+	check_admin_referer('bulk-media');
+	foreach( (array) $_GET['delete'] as $post_id_del ) {
+		$post_del = & get_post($post_id_del);
+
+		if ( !current_user_can('delete_post', $post_id_del) )
+			wp_die( __('You are not allowed to delete this post.') );
+
+		if ( $post_del->post_type == 'attachment' )
+			if ( ! wp_delete_attachment($post_id_del) )
+				wp_die( __('Error in deleting...') );
+	}
+
+	$location = 'upload.php';
+	if ( $referer = wp_get_referer() ) {
+		if ( false !== strpos($referer, 'upload.php') )
+			$location = $referer;
+	}
+
+	$location = add_query_arg('message', 2, $location);
+	$location = remove_query_arg('posted', $location);
+	wp_redirect($location);
+	exit;
+} elseif ( !empty($_GET['_wp_http_referer']) ) {
+	wp_redirect(remove_query_arg(array('_wp_http_referer', '_wpnonce'), stripslashes($_SERVER['REQUEST_URI'])));
+	exit;
+}
+
+$title = __('Media Library');
+$parent_file = 'edit.php';
+wp_enqueue_script( 'admin-forms' );
+
+list($post_mime_types, $avail_post_mime_types) = wp_edit_attachments_query();
+
+if ( is_singular() )
+	wp_enqueue_script( 'admin-comments' );
 
 require_once('admin-header.php');
 
-if ($user_level == 0) //Checks to see if user has logged in
-	die (__("Cheatin' uh ?"));
+if ( !isset( $_GET['paged'] ) )
+	$_GET['paged'] = 1;
 
-if (!get_settings('use_fileupload')) //Checks if file upload is enabled in the config
-	die (__("The admin disabled this function"));
-
-if ( !get_settings('fileupload_minlevel') )
-	die (__("You are not allowed to upload files"));
-
-$allowed_types = explode(' ', trim(strtolower(get_settings('fileupload_allowedtypes'))));
-
-if ($_POST['submit']) {
-	$action = 'upload';
-} else {
-	$action = '';
-}
-
-if (!is_writable(get_settings('fileupload_realpath')))
-	$action = 'not-writable';
 ?>
 
 <div class="wrap">
 
-<?php
-switch ($action) {
-case 'not-writable':
-?>
-<p><?php printf(__("It doesn't look like you can use the file upload feature at this time because the directory you have specified (<code>%s</code>) doesn't appear to be writable by WordPress. Check the permissions on the directory and for typos."), get_settings('fileupload_realpath')) ?></p>
-
-<?php
-break;
-case '':
-	foreach ($allowed_types as $type) {
-		$type_tags[] = "<code>$type</code>";
+<form id="posts-filter" action="" method="get">
+<h2><?php
+if ( is_singular() ) {
+	printf(__('Comments on %s'), apply_filters( "the_title", $post->post_title));
+} else {
+	$post_mime_type_label = _c('Manage Media|manage media header');
+	if ( isset($_GET['post_mime_type']) && in_array( $_GET['post_mime_type'], array_keys($post_mime_types) ) )
+        $post_mime_type_label = $post_mime_types[$_GET['post_mime_type']][1];
+	if ( $post_listing_pageable && !is_archive() && !is_search() )
+		$h2_noun = is_paged() ? sprintf(__( 'Previous %s' ), $post_mime_type_label) : sprintf(__('Latest %s'), $post_mime_type_label);
+	else
+		$h2_noun = $post_mime_type_label;
+	// Use $_GET instead of is_ since they can override each other
+	$h2_author = '';
+	$_GET['author'] = (int) $_GET['author'];
+	if ( $_GET['author'] != 0 ) {
+		if ( $_GET['author'] == '-' . $user_ID ) { // author exclusion
+			$h2_author = ' ' . __('by other authors');
+		} else {
+			$author_user = get_userdata( get_query_var( 'author' ) );
+			$h2_author = ' ' . sprintf(__('by %s'), wp_specialchars( $author_user->display_name ));
+		}
 	}
-	$i = implode(', ', $type_tags);
-?>
-<p><?php printf(__('You can upload files with the extension %1$s as long as they are no larger than %2$s <abbr title="Kilobytes">KB</abbr>. If you&#8217;re an admin you can configure these values under <a href="%3$s">options</a>.'), $i, get_settings('fileupload_maxk'), 'options-misc.php') ?></p>
-    <form action="upload.php" method="post" enctype="multipart/form-data">
-    <p>
-      <label for="img1"><?php _e('File:') ?></label>
-      <br />
-	<input type="hidden" name="MAX_FILE_SIZE" value="<?php echo get_settings('fileupload_maxk') * 1024 ?>" />
-    <input type="file" name="img1" id="img1" size="35" class="uploadform" /></p>
-    <p>
-    <label for="imgdesc"><?php _e('Description:') ?></label><br />
-    <input type="text" name="imgdesc" id="imgdesc" size="30" class="uploadform" />
-    </p>
-	
-    <p><?php _e('Create a thumbnail?') ?></p>
-    <p>
-    <label for="thumbsize_no">
-    <input type="radio" name="thumbsize" value="none" checked="checked" id="thumbsize_no" />
-    <?php _e('No thanks') ?></label>
-    <br />
-        <label for="thumbsize_small">
-<input type="radio" name="thumbsize" value="small" id="thumbsize_small" />
-<?php _e('Small (200px largest side)') ?></label>
-        <br />
-        <label for="thumbsize_large">
-<input type="radio" name="thumbsize" value="large" id="thumbsize_large" />
-<?php _e('Large (400px largest side)') ?></label>
-        <br />
-        <label for="thumbsize_custom">
-        <input type="radio" name="thumbsize" value="custom" id="thumbsize_custom" />
-<?php _e('Custom size') ?></label>
-      : 
-      <input type="text" name="imgthumbsizecustom" size="4" />
-    <?php _e('px (largest side)') ?>    </p>
-	<p><input type="submit" name="submit" value="<?php _e('Upload File') ?>" /></p>
-    </form>
-</div><?php 
-break;
-case 'upload':
-
-	$imgalt = basename( (isset($_POST['imgalt'])) ? $_POST['imgalt'] : '' );
-
-	$img1_name = (strlen($imgalt)) ? $imgalt : basename( $_FILES['img1']['name'] );
-	$img1_name = preg_replace('/[^a-z0-9_.]/i', '', $img1_name); 
-	$img1_size = $_POST['img1_size'] ? intval($_POST['img1_size']) : intval($_FILES['img1']['size']);
-
-	$img1_type = (strlen($imgalt)) ? $_POST['img1_type'] : $_FILES['img1']['type'];
-	$imgdesc = htmlentities2($_POST['imgdesc']);
-
-	$pi = pathinfo($img1_name);
-	$imgtype = strtolower($pi['extension']);
-
-	if (in_array($imgtype, $allowed_types) == false)
-		die(sprintf(__('File %1$s of type %2$s is not allowed.') , $img1_name, $imgtype));
-
-    if (strlen($imgalt)) {
-        $pathtofile = get_settings('fileupload_realpath')."/".$imgalt;
-        $img1 = $_POST['img1'];
-    } else {
-        $pathtofile = get_settings('fileupload_realpath')."/".$img1_name;
-        $img1 = $_FILES['img1']['tmp_name'];
-    }
-
-    // makes sure not to upload duplicates, rename duplicates
-    $i = 1;
-    $pathtofile2 = $pathtofile;
-    $tmppathtofile = $pathtofile2;
-    $img2_name = $img1_name;
-
-    while ( file_exists($pathtofile2) ) {
-        $pos = strpos( strtolower($tmppathtofile), '.' . trim($imgtype) );
-        $pathtofile_start = substr($tmppathtofile, 0, $pos);
-        $pathtofile2 = $pathtofile_start.'_'.zeroise($i++, 2).'.'.trim($imgtype);
-        $img2_name = explode('/', $pathtofile2);
-        $img2_name = $img2_name[count($img2_name)-1];
-    }
-
-    if (file_exists($pathtofile) && !strlen($imgalt)) {
-        $i = explode(' ', get_settings('fileupload_allowedtypes'));
-        $i = implode(', ',array_slice($i, 1, count($i)-2));
-        $moved = move_uploaded_file($img1, $pathtofile2);
-        // if move_uploaded_file() fails, try copy()
-        if (!$moved) {
-            $moved = copy($img1, $pathtofile2);
-        }
-        if (!$moved) {
-            die(sprintf(__("Couldn't upload your file to %s."), $pathtofile2));
-        } else {
-			chmod($pathtofile2, 0666);
-            @unlink($img1);
-        }
-
-	// 
-    
-    // duplicate-renaming function contributed by Gary Lawrence Murphy
-    ?>
-    <p><strong><?php __('Duplicate File?') ?></strong></p>
-    <p><b><em><?php printf(__("The filename '%s' already exists!"), $img1_name); ?></em></b></p>
-    <p> <?php printf(__("Filename '%1\$s' moved to '%2\$s'"), $img1, "$pathtofile2 - $img2_name") ?></p>
-    <p><?php _e('Confirm or rename:') ?></p>
-    <form action="upload.php" method="post" enctype="multipart/form-data">
-    <input type="hidden" name="MAX_FILE_SIZE" value="<?php echo  get_settings('fileupload_maxk') *1024 ?>" />
-    <input type="hidden" name="img1_type" value="<?php echo $img1_type;?>" />
-    <input type="hidden" name="img1_name" value="<?php echo $img2_name;?>" />
-    <input type="hidden" name="img1_size" value="<?php echo $img1_size;?>" />
-    <input type="hidden" name="img1" value="<?php echo $pathtofile2;?>" />
-    <input type="hidden" name="thumbsize" value="<?php echo $_REQUEST['thumbsize'];?>" />
-    <input type="hidden" name="imgthumbsizecustom" value="<?php echo $_REQUEST['imgthumbsizecustom'];?>" />
-    <?php _e('Alternate name:') ?><br /><input type="text" name="imgalt" size="30" class="uploadform" value="<?php echo $img2_name;?>" /><br />
-    <br />
-    <?php _e('Description:') ?><br /><input type="text" name="imgdesc" size="30" class="uploadform" value="<?php echo $imgdesc;?>" />
-    <br />
-    <input type="submit" name="submit" value="<?php _e('Rename') ?>" class="search" />
-    </form>
-</div>
-<?php 
-
-require('admin-footer.php');
-die();
-
-    }
-
-    if (!strlen($imgalt)) {
-        @$moved = move_uploaded_file($img1, $pathtofile); //Path to your images directory, chmod the dir to 777
-        // move_uploaded_file() can fail if open_basedir in PHP.INI doesn't
-        // include your tmp directory. Try copy instead?
-        if(!$moved) {
-            $moved = copy($img1, $pathtofile);
-        }
-        // Still couldn't get it. Give up.
-        if (!$moved) {
-            die(sprintf(__("Couldn't upload your file to %s."), $pathtofile));
-        } else {
-			chmod($pathtofile, 0666);
-            @unlink($img1);
-        }
-        
-    } else {
-        rename($img1, $pathtofile)
-        or die(sprintf(__("Couldn't upload your file to %s."), $pathtofile));
-    }
-    
-    if($_POST['thumbsize'] != 'none' ) {
-        if($_POST['thumbsize'] == 'small') {
-            $max_side = 200;
-        }
-        elseif($_POST['thumbsize'] == 'large') {
-            $max_side = 400;
-        }
-        elseif($_POST['thumbsize'] == 'custom') {
-            $max_side = intval($_POST['imgthumbsizecustom']);
-        }
-        
-        $result = wp_create_thumbnail($pathtofile, $max_side, NULL);
-        if($result != 1) {
-            print $result;
-        }
-    }
-
-if ( ereg('image/',$img1_type) )
-	$piece_of_code = "<img src='" . get_settings('fileupload_url') ."/$img1_name' alt='$imgdesc' />";
-else
-	$piece_of_code = "<a href='". get_settings('fileupload_url') . "/$img1_name' title='$imgdesc'>$imgdesc</a>";
-
-$piece_of_code = htmlspecialchars( $piece_of_code );
-?>
-
-<h3><?php _e('File uploaded!') ?></h3>
-<p><?php printf(__("Your file <code>%s</code> was uploaded successfully!"), $img1_name); ?></p>
-<p><?php _e('Here&#8217;s the code to display it:') ?></p>
-<p><code><?php echo $piece_of_code; ?></code>
-</p>
-<p><strong><?php _e('Image Details') ?></strong>: <br />
-<?php _e('Name:'); ?>
-<?php echo $img1_name; ?>
-<br />
-<?php _e('Size:') ?>
-<?php echo round($img1_size / 1024, 2); ?> <?php _e('<abbr title="Kilobyte">KB</abbr>') ?><br />
-<?php _e('Type:') ?>
-<?php echo $img1_type; ?>
-</p>
-</div>
-<p><a href="upload.php"><?php _e('Upload another') ?></a></p>
-<?php
-break;
+	$h2_search = isset($_GET['s'])   && $_GET['s']   ? ' ' . sprintf(__('matching &#8220;%s&#8221;'), wp_specialchars( get_search_query() ) ) : '';
+	$h2_cat    = isset($_GET['cat']) && $_GET['cat'] ? ' ' . sprintf( __('in &#8220;%s&#8221;'), single_cat_title('', false) ) : '';
+	$h2_tag    = isset($_GET['tag']) && $_GET['tag'] ? ' ' . sprintf( __('tagged with &#8220;%s&#8221;'), single_tag_title('', false) ) : '';
+	$h2_month  = isset($_GET['m'])   && $_GET['m']   ? ' ' . sprintf( __('during %s'), single_month_title(' ', false) ) : '';
+	printf( _c( '%1$s%2$s%3$s%4$s%5$s%6$s|You can reorder these: 1: Posts, 2: by {s}, 3: matching {s}, 4: in {s}, 5: tagged with {s}, 6: during {s}' ), $h2_noun, $h2_author, $h2_search, $h2_cat, $h2_tag, $h2_month );
 }
-include('admin-footer.php');
+?></h2>
+
+<ul class="subsubsub">
+<?php
+$type_links = array();
+$_num_posts = (array) wp_count_attachments();
+$matches = wp_match_mime_types(array_keys($post_mime_types), array_keys($_num_posts));
+foreach ( $matches as $type => $reals )
+	foreach ( $reals as $real )
+		$num_posts[$type] += $_num_posts[$real];
+$class = empty($_GET['post_mime_type']) ? ' class="current"' : '';
+$type_links[] = "<li><a href=\"upload.php\"$class>".__('All Types')."</a>";
+foreach ( $post_mime_types as $mime_type => $label ) {
+	$class = '';
+
+	if ( !wp_match_mime_types($mime_type, $avail_post_mime_types) )
+		continue;
+
+	if ( wp_match_mime_types($mime_type, $_GET['post_mime_type']) )
+		$class = ' class="current"';
+
+	$type_links[] = "<li><a href=\"upload.php?post_mime_type=$mime_type\"$class>" .
+	sprintf(__ngettext($label[2][0], $label[2][1], $num_posts[$mime_type]), number_format_i18n( $num_posts[$mime_type] )) . '</a>';
+}
+echo implode(' | </li>', $type_links) . '</li>';
+unset($type_links);
 ?>
+</ul>
+
+<?php
+if ( isset($_GET['posted']) && $_GET['posted'] ) : $_GET['posted'] = (int) $_GET['posted']; ?>
+<div id="message" class="updated fade"><p><strong><?php _e('Your media has been saved.'); ?></strong> <a href="<?php echo get_permalink( $_GET['posted'] ); ?>"><?php _e('View media'); ?></a> | <a href="media.php?action=edit&amp;attachment_id=<?php echo $_GET['posted']; ?>"><?php _e('Edit media'); ?></a></p></div>
+<?php $_SERVER['REQUEST_URI'] = remove_query_arg(array('posted'), $_SERVER['REQUEST_URI']);
+endif;
+
+$messages[1] = __('Media updated.');
+$messages[2] = __('Media deleted.');
+
+if (isset($_GET['message'])) : ?>
+<div id="message" class="updated fade"><p><?php echo $messages[$_GET['message']]; ?></p></div>
+<?php $_SERVER['REQUEST_URI'] = remove_query_arg(array('message'), $_SERVER['REQUEST_URI']);
+endif;
+?>
+
+<p id="post-search">
+	<input type="text" id="post-search-input" name="s" value="<?php the_search_query(); ?>" />
+	<input type="submit" value="<?php _e( 'Search Media' ); ?>" class="button" />
+</p>
+
+<?php do_action('restrict_manage_posts'); ?>
+
+<div class="tablenav">
+
+<?php
+$page_links = paginate_links( array(
+	'base' => add_query_arg( 'paged', '%#%' ),
+	'format' => '',
+	'total' => $wp_query->max_num_pages,
+	'current' => $_GET['paged']
+));
+
+if ( $page_links )
+	echo "<div class='tablenav-pages'>$page_links</div>";
+?>
+
+<div class="alignleft">
+<input type="submit" value="<?php _e('Delete'); ?>" name="deleteit" class="button-secondary delete" />
+<?php wp_nonce_field('bulk-media'); ?>
+<?php
+
+if ( !is_singular() ) :
+	$arc_query = "SELECT DISTINCT YEAR(post_date) AS yyear, MONTH(post_date) AS mmonth FROM $wpdb->posts WHERE post_type = 'attachment' ORDER BY post_date DESC";
+
+	$arc_result = $wpdb->get_results( $arc_query );
+
+	$month_count = count($arc_result);
+
+	if ( $month_count && !( 1 == $month_count && 0 == $arc_result[0]->mmonth ) ) : ?>
+<select name='m'>
+<option<?php selected( @$_GET['m'], 0 ); ?> value='0'><?php _e('Show all dates'); ?></option>
+<?php
+foreach ($arc_result as $arc_row) {
+	if ( $arc_row->yyear == 0 )
+		continue;
+	$arc_row->mmonth = zeroise( $arc_row->mmonth, 2 );
+
+	if ( $arc_row->yyear . $arc_row->mmonth == $_GET['m'] )
+		$default = ' selected="selected"';
+	else
+		$default = '';
+
+	echo "<option$default value='$arc_row->yyear$arc_row->mmonth'>";
+	echo $wp_locale->get_month($arc_row->mmonth) . " $arc_row->yyear";
+	echo "</option>\n";
+}
+?>
+</select>
+<?php endif; // month_count ?>
+
+<input type="submit" id="post-query-submit" value="<?php _e('Filter'); ?>" class="button-secondary" />
+
+<?php endif; // is_singular ?>
+
+</div>
+
+<br class="clear" />
+</div>
+
+<br class="clear" />
+
+<?php include( 'edit-attachment-rows.php' ); ?>
+
+</form>
+
+<div id="ajax-response"></div>
+
+<div class="tablenav">
+
+<?php
+if ( $page_links )
+	echo "<div class='tablenav-pages'>$page_links</div>";
+?>
+
+</div>
+
+<br class="clear" />
+
+<?php
+ 
+if ( 1 == count($posts) && is_singular() ) :
+	
+	$comments = $wpdb->get_results("SELECT * FROM $wpdb->comments WHERE comment_post_ID = $id AND comment_approved != 'spam' ORDER BY comment_date");
+	if ( $comments ) :
+		// Make sure comments, post, and post_author are cached
+		update_comment_cache($comments);
+		$post = get_post($id);
+		$authordata = get_userdata($post->post_author);
+	?>
+
+<br class="clear" />
+
+<table class="widefat" style="margin-top: .5em">
+<thead>
+  <tr>
+    <th scope="col"><?php _e('Comment') ?></th>
+    <th scope="col"><?php _e('Date') ?></th>
+    <th scope="col"><?php _e('Actions') ?></th>
+  </tr>
+</thead>
+<tbody id="the-comment-list" class="list:comment">
+<?php
+        foreach ($comments as $comment)
+                _wp_comment_row( $comment->comment_ID, 'detail', false, false );
+?>
+</tbody>
+</table>
+
+<?php
+
+endif; // comments
+endif; // posts;
+
+?>
+
+</div>
+
+<?php include('admin-footer.php'); ?>

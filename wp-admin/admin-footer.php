@@ -1,13 +1,14 @@
-
-<div id="footer"><p><a href="http://wordpress.org/"><img src="../wp-images/wp-small.png" alt="WordPress" /></a><br />
-<?php bloginfo('version'); ?> <br /> 
-<a href="http://codex.wordpress.org/"><?php _e('Documentation'); ?></a> &#8212; <a href="http://wordpress.org/support/"><?php _e('Support Forums'); ?></a> <br />
-<?php printf(__('%s seconds'), number_format(timer_stop(), 2)); ?>
-</p>
-
+</div><!-- wpbody -->
+</div><!-- wpcontent -->
+</div><!-- wpwrap -->
+<div id="footer">
+<p><?php
+do_action('in_admin_footer', '');
+$upgrade = apply_filters( 'update_footer', '' );
+echo __('Thank you for creating with <a href="http://wordpress.org/">WordPress</a>').' | '.__('<a href="http://codex.wordpress.org/">Documentation</a>').' | '.__('<a href="http://wordpress.org/support/forum/4">Feedback</a>').' '.$upgrade;
+?></p>
 </div>
-
 <?php do_action('admin_footer', ''); ?>
-
+<script type="text/javascript">if(typeof wpOnload=='function')wpOnload();</script>
 </body>
 </html>
