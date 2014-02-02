@@ -6,8 +6,8 @@
  * @subpackage Administration
  */
 
-/** Load WordPress Bootstrap */
-require_once('../wp-load.php');
+if ( ! defined('ABSPATH') )
+	die();
 
 global $opml, $map;
 
@@ -27,7 +27,7 @@ $map = $opml_map;
 /**
  * XML callback function for the start of a new XML tag.
  *
- * @since unknown
+ * @since 0.71
  * @access private
  *
  * @uses $updated_timestamp Not used inside function.
@@ -68,7 +68,7 @@ function startElement($parser, $tagName, $attrs) {
 /**
  * XML callback function that is called at the end of a XML tag.
  *
- * @since unknown
+ * @since 0.71
  * @access private
  * @package WordPress
  * @subpackage Dummy
