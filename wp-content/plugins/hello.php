@@ -2,14 +2,14 @@
 /**
  * @package Hello_Dolly
  * @author Matt Mullenweg
- * @version 1.5.1
+ * @version 1.5
  */
 /*
 Plugin Name: Hello Dolly
 Plugin URI: http://wordpress.org/#
 Description: This is not just a plugin, it symbolizes the hope and enthusiasm of an entire generation summed up in two words sung most famously by Louis Armstrong: Hello, Dolly. When activated you will randomly see a lyric from <cite>Hello, Dolly</cite> in the upper right of your admin screen on every page.
 Author: Matt Mullenweg
-Version: 1.5.1
+Version: 1.5
 Author URI: http://ma.tt/
 */
 
@@ -62,9 +62,6 @@ add_action('admin_footer', 'hello_dolly');
 
 // We need some CSS to position the paragraph
 function dolly_css() {
-	// This makes sure that the posinioning is also good for right-to-left languages
-	$x = ( 'rtl' == get_bloginfo( 'text_direction' ) ) ? 'left' : 'right';
-
 	echo "
 	<style type='text/css'>
 	#dolly {
@@ -72,7 +69,7 @@ function dolly_css() {
 		top: 4.5em;
 		margin: 0;
 		padding: 0;
-		$x: 215px;
+		right: 215px;
 		font-size: 11px;
 	}
 	</style>

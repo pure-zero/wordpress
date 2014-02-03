@@ -165,7 +165,7 @@ function the_content_rss($more_link_text='(more...)', $stripteaser=0, $more_file
 	if ( $cut && !$encode_html )
 		$encode_html = 2;
 	if ( 1== $encode_html ) {
-		$content = esc_html($content);
+		$content = wp_specialchars($content);
 		$cut = 0;
 	} elseif ( 0 == $encode_html ) {
 		$content = make_url_footnote($content);
@@ -255,7 +255,7 @@ function get_comment_guid($comment_id = null) {
  * @since 1.5.0
  */
 function comment_link() {
-	echo esc_url( get_comment_link() );
+	echo clean_url( get_comment_link() );
 }
 
 /**
@@ -336,11 +336,11 @@ function get_the_category_rss($type = 'rss') {
 
 	foreach ( $cat_names as $cat_name ) {
 		if ( 'rdf' == $type )
-			$the_list .= "\t\t<dc:subject><![CDATA[$cat_name]]></dc:subject>\n";
+			$the_list .= "\n\t\t<dc:subject><![CDATA[$cat_name]]></dc:subject>\n";
 		elseif ( 'atom' == $type )
-			$the_list .= sprintf( '<category scheme="%1$s" term="%2$s" />', esc_attr( apply_filters( 'get_bloginfo_rss', get_bloginfo( 'url' ) ) ), esc_attr( $cat_name ) );
+			$the_list .= sprintf( '<category scheme="%1$s" term="%2$s" />', attribute_escape( apply_filters( 'get_bloginfo_rss', get_bloginfo( 'url' ) ) ), attribute_escape( $cat_name ) );
 		else
-			$the_list .= "\t\t<category><![CDATA[" . @html_entity_decode( $cat_name, ENT_COMPAT, get_option('blog_charset') ) . "]]></category>\n";
+			$the_list .= "\n\t\t<category><![CDATA[" . html_entity_decode( $cat_name ) . "]]></category>\n";
 	}
 
 	return apply_filters('the_category_rss', $the_list, $type);
@@ -503,7 +503,7 @@ function prep_atom_text_construct($data) {
 function self_link() {
 	$host = @parse_url(get_option('home'));
 	$host = $host['host'];
-	echo esc_url(
+	echo clean_url(
 		'http'
 		. ( (isset($_SERVER['https']) && $_SERVER['https'] == 'on') ? 's' : '' ) . '://'
 		. $host
@@ -511,51 +511,4 @@ function self_link() {
 		);
 }
 
-/**
- * Return the content type for specified feed type.
- *
- * @package WordPress
- * @subpackage Feed
- * @since 2.8.0
- */
-function feed_content_type( $type = '' ) {
-	if ( empty($type) )
-		$type = get_default_feed();
-
-	$types = array(
-		'rss'  => 'application/rss+xml',
-		'rss2' => 'application/rss+xml',
-		'rss-http'  => 'text/xml',
-		'atom' => 'application/atom+xml',
-		'rdf'  => 'application/rdf+xml'
-	);
-
-	$content_type = ( !empty($types[$type]) ) ? $types[$type] : 'application/octet-stream';
-
-	return apply_filters( 'feed_content_type', $content_type, $type );
-}
-
-/**
- * Build SimplePie object based on RSS or Atom feed from URL.
- *
- * @since 2.8
- *
- * @param string $url URL to retrieve feed
- * @return WP_Error|SimplePie WP_Error object on failure or SimplePie object on success
- */
-function fetch_feed($url) {
-	require_once (ABSPATH . WPINC . '/class-feed.php');
-
-	$feed = new SimplePie();
-	$feed->set_feed_url($url);
-	$feed->set_cache_class('WP_Feed_Cache');
-	$feed->set_file_class('WP_SimplePie_File');
-	$feed->set_cache_duration(apply_filters('wp_feed_cache_transient_lifetime', 43200));
-	$feed->init();
-	$feed->handle_content_type();
-
-	if ( $feed->error() )
-		return new WP_Error('simplepie-error', $feed->error());
-
-	return $feed;
-}
+?>
