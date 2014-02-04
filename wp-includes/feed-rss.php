@@ -1,10 +1,15 @@
 <?php
-header('Content-Type: text/xml; charset=' . get_option('blog_charset'), true);
+/**
+ * RSS 0.92 Feed Template for displaying RSS 0.92 Posts feed.
+ *
+ * @package WordPress
+ */
+
+header('Content-Type: ' . feed_content_type('rss-http') . '; charset=' . get_option('blog_charset'), true);
 $more = 1;
 
-?>
-<?php echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>'; ?>
-<!-- generator="wordpress/<?php echo $wp_version ?>" -->
+echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>'; ?>
+<?php the_generator( 'comment' ); ?>
 <rss version="0.92">
 <channel>
 	<title><?php bloginfo_rss('name'); wp_title_rss(); ?></title>
@@ -18,11 +23,7 @@ $more = 1;
 <?php while (have_posts()) : the_post(); ?>
 	<item>
 		<title><?php the_title_rss() ?></title>
-<?php if (get_option('rss_use_excerpt')) { ?>
 		<description><![CDATA[<?php the_excerpt_rss() ?>]]></description>
-<?php } else { // use content ?>
-		<description><?php the_content_rss('', 0, '', get_option('rss_excerpt_length')) ?></description>
-<?php } ?>
 		<link><?php the_permalink_rss() ?></link>
 		<?php do_action('rss_item'); ?>
 	</item>
