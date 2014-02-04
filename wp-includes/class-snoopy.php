@@ -78,7 +78,7 @@ class Snoopy
 	var $error			=	"";					// error messages sent here
 	var	$response_code	=	"";					// response code returned from server
 	var	$headers		=	array();			// headers returned from server sent here
-	var	$maxlength		=	500000;				// max return data length (body)
+	var	$maxlength		=	8192;				// max return data length (body)
 	var $read_timeout	=	0;					// timeout on read operations, in seconds
 												// supported only since PHP 4 Beta 4
 												// set to 0 to disallow timeouts
@@ -720,13 +720,13 @@ class Snoopy
 							chr(176),
 							chr(39),
 							chr(128),
-							"ä",
-							"ö",
-							"ü",
-							"Ä",
-							"Ö",
-							"Ü",
-							"ß",
+							"Ã¤",
+							"Ã¶",
+							"Ã¼",
+							"Ã„",
+							"Ã–",
+							"Ãœ",
+							"ÃŸ",
 						);
 
 		$text = preg_replace($search,$replace,$document);
@@ -796,7 +796,7 @@ class Snoopy
 			$headers .= "User-Agent: ".$this->agent."\r\n";
 		if(!empty($this->host) && !isset($this->rawheaders['Host'])) {
 			$headers .= "Host: ".$this->host;
-			if(!empty($this->port))
+			if(!empty($this->port) && $this->port != 80)
 				$headers .= ":".$this->port;
 			$headers .= "\r\n";
 		}
@@ -816,7 +816,7 @@ class Snoopy
 				$cookie_headers .= $cookieKey."=".urlencode($cookieVal)."; ";
 				}
 				$headers .= substr($cookie_headers,0,-2) . "\r\n";
-			} 
+			}
 		}
 		if(!empty($this->rawheaders))
 		{
@@ -1238,7 +1238,9 @@ class Snoopy
 						if (!is_readable($file_name)) continue;
 
 						$fp = fopen($file_name, "r");
-						$file_content = fread($fp, filesize($file_name));
+						while (!feof($fp)) {
+							$file_content .= fread($fp, filesize($file_name));
+						}
 						fclose($fp);
 						$base_name = basename($file_name);
 
