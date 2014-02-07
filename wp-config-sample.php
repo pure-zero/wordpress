@@ -68,7 +68,7 @@ define ('WPLANG', '');
 
 /* That's all, stop editing! Happy blogging. */
 
-/** Absolute path to the WordPress directory. */
+/** WordPress absolute path to the Wordpress directory. */
 if ( !defined('ABSPATH') )
 	define('ABSPATH', dirname(__FILE__) . '/');
 

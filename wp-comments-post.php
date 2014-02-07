@@ -30,9 +30,6 @@ if ( empty($status->comment_status) ) {
 } elseif ( in_array($status->post_status, array('draft', 'future', 'pending') ) ) {
 	do_action('comment_on_draft', $comment_post_ID);
 	exit;
-} elseif ( 'trash' == $status->post_status ) {
-	do_action('comment_on_trash', $comment_post_ID);
-	exit;
 } elseif ( post_password_required($comment_post_ID) ) {
 	do_action('comment_on_password_protected', $comment_post_ID);
 	exit;
