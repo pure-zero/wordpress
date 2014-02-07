@@ -1,272 +1,149 @@
 <?php
-require_once ('admin.php');
-$title = __('Export');
-$parent_file = 'edit.php';
+/**
+ * WordPress Export Administration Panel
+ *
+ * @package WordPress
+ * @subpackage Administration
+ */
 
-if ( isset( $_GET['download'] ) )
-	export_wp();
+/** Load WordPress Bootstrap */
+require_once ('admin.php');
+
+if ( !current_user_can('export') )
+	wp_die(__('You do not have sufficient permissions to export the content of this site.'));
+
+/** Load WordPress export API */
+require_once('./includes/export.php');
+$title = __('Export');
+
+add_contextual_help($current_screen,
+	'<p>' . __('You can export a file of your site&#8217;s content in order to import it into another installation or platform. The export file will be an XML file format called WXR. Posts, pages, comments, custom fields, categories, and tags can be included. You can set filters to have the WXR file only include a certain date, author, category, tag, all posts or all pages, certain publishing statuses.') . '</p>' .
+	'<p>' . __('Once generated, your WXR file can be imported by another WordPress site or by another blogging platform able to access this format.') . '</p>' .
+	'<p><strong>' . __('For more information:') . '</strong></p>' .
+	'<p>' . __('<a href="http://codex.wordpress.org/Tools_Export_SubPanel" target="_blank">Export Documentation</a>') . '</p>' .
+	'<p>' . __('<a href="http://wordpress.org/support/" target="_blank">Support Forums</a>') . '</p>'
+);
+
+if ( isset( $_GET['download'] ) ) {
+		$author = isset($_GET['author']) ? $_GET['author'] : 'all';
+		$taxonomy = array();
+		foreach ( get_taxonomies( array( 'show_ui' => true ) ) as $tax )
+			$taxonomy[ $tax ] = ! empty( $_GET['export_taxonomy'][ $tax ] ) ? $_GET['export_taxonomy'][ $tax ] : 'all';
+		$post_type = isset($_GET['export_post_type']) ? stripslashes_deep($_GET['export_post_type']) : 'all';
+		$status = isset($_GET['export_post_status']) ? stripslashes_deep($_GET['export_post_status']) : 'all';
+		$mm_start = isset($_GET['mm_start']) ? $_GET['mm_start'] : 'all';
+		$mm_end = isset($_GET['mm_end']) ? $_GET['mm_end'] : 'all';
+		if( $mm_start != 'all' ) {
+			$start_date = sprintf( "%04d-%02d-%02d", substr( $mm_start, 0, 4 ), substr( $mm_start, 5, 2 ), 1 );
+		} else {
+			$start_date = 'all';
+		}
+		if( $mm_end != 'all' ) {
+			$end_date = sprintf( "%04d-%02d-%02d", substr( $mm_end, 0, 4 ), substr( $mm_end, 5, 2 ), 1 );
+		} else {
+			$end_date = 'all';
+		}
+
+	export_wp( array( 'author' => $author, 'taxonomy' => $taxonomy, 'post_type' => $post_type, 'post_status' => $status, 'start_date' => $start_date, 'end_date' => $end_date ) );
+	die();
+}
 
 require_once ('admin-header.php');
+
+$dateoptions = $edateoptions = '';
+$types = "'" . implode("', '", get_post_types( array( 'public' => true, 'can_export' => true ), 'names' )) . "'";
+$stati = "'" . implode("', '", get_post_stati( array( 'internal' => false ), 'names' )) . "'";
+if ( $monthyears = $wpdb->get_results("SELECT DISTINCT YEAR(post_date) AS `year`, MONTH(post_date) AS `month`, YEAR(DATE_ADD(post_date, INTERVAL 1 MONTH)) AS `eyear`, MONTH(DATE_ADD(post_date, INTERVAL 1 MONTH)) AS `emonth` FROM $wpdb->posts WHERE post_type IN ($types) AND post_status IN ($stati) ORDER BY post_date ASC ") ) {
+	foreach ( $monthyears as $k => $monthyear )
+		$monthyears[$k]->lmonth = $wp_locale->get_month( $monthyear->month, 2 );
+	for( $s = 0, $e = count( $monthyears ) - 1; $e >= 0; $s++, $e-- ) {
+		$dateoptions .= "\t<option value=\"" . $monthyears[$s]->year . '-' . zeroise( $monthyears[$s]->month, 2 ) . '">' . $monthyears[$s]->lmonth . ' ' . $monthyears[$s]->year . "</option>\n";
+		$edateoptions .= "\t<option value=\"" . $monthyears[$e]->eyear . '-' . zeroise( $monthyears[$e]->emonth, 2 ) . '">' . $monthyears[$e]->lmonth . ' ' . $monthyears[$e]->year . "</option>\n";
+	}
+}
+
 ?>
 
 <div class="wrap">
-<h2><?php _e('Export'); ?></h2>
-<div class="narrow">
-<p><?php _e('When you click the button below WordPress will create an XML file for you to save to your computer.'); ?></p>
-<p><?php _e('This format, which we call WordPress eXtended RSS or WXR, will contain your posts, comments, custom fields, and categories.'); ?></p>
-<p><?php _e('Once you&#8217;ve saved the download file, you can use the Import function on another WordPress blog to import this blog.'); ?></p>
-<form action="" method="get">
-<h3><?php _e('Optional options'); ?></h3>
+<?php screen_icon(); ?>
+<h2><?php echo esc_html( $title ); ?></h2>
 
-<table>
+<p><?php _e('When you click the button below WordPress will create an XML file for you to save to your computer.'); ?></p>
+<p><?php _e('This format, which we call WordPress eXtended RSS or WXR, will contain your posts, pages, comments, custom fields, categories, and tags.'); ?></p>
+<p><?php _e('Once you&#8217;ve saved the download file, you can use the Import function on another WordPress site to import this site.'); ?></p>
+<form action="" method="get">
+<h3><?php _e('Filters'); ?></h3>
+
+<table class="form-table">
 <tr>
-<th><?php _e('Restrict Author:'); ?></th>
+<th><label for="mm_start"><?php _e('Start Date'); ?></label></th>
 <td>
-<select name="author">
-<option value="all" selected="selected"><?php _e('All'); ?></option>
+<select name="mm_start" id="mm_start">
+	<option value="all" selected="selected"><?php _e('All Dates'); ?></option>
+<?php echo $dateoptions; ?>
+</select>
+</td>
+</tr>
+<tr>
+<th><label for="mm_end" id="mm_end"><?php _e('End Date'); ?></label></th>
+<td>
+<select name="mm_end" id="mm_end">
+	<option value="all" selected="selected"><?php _e('All Dates'); ?></option>
+<?php echo $edateoptions; ?>
+</select>
+</td>
+</tr>
+<tr>
+<th><label for="author"><?php _e('Authors'); ?></label></th>
+<td>
+<select name="author" id="author">
+<option value="all" selected="selected"><?php _e('All Authors'); ?></option>
 <?php
-$authors = $wpdb->get_col( "SELECT post_author FROM $wpdb->posts GROUP BY post_author" );
-foreach ( $authors as $id ) {
-	$o = get_userdata( $id );
-	echo "<option value='$o->ID'>$o->display_name</option>";
+$authors = $wpdb->get_results( "SELECT DISTINCT u.id, u.display_name FROM $wpdb->users u INNER JOIN $wpdb->posts p WHERE u.id = p.post_author ORDER BY u.display_name" );
+foreach ( (array) $authors as $author ) {
+	echo "<option value='{$author->id}'>{$author->display_name}</option>\n";
 }
 ?>
 </select>
 </td>
 </tr>
+<?php foreach ( get_taxonomies( array( 'show_ui' => true ), 'objects' ) as $tax_obj ) {
+	$term_dropdown = wp_dropdown_categories( array( 'taxonomy' => $tax_obj->name, 'hide_if_empty' => true, 'show_option_all' => __( 'All Terms' ), 'name' => 'export_taxonomy[' . $tax_obj->name . ']', 'id' => 'taxonomy-' . $tax_obj->name, 'class' => '', 'echo' => false ) );
+	if ( $term_dropdown )
+		echo '<tr><th><label for="taxonomy-' . $tax_obj->name . '">' . $tax_obj->labels->name . '</label></th><td>' . $term_dropdown . '</td></tr>';
+}
+?>
+<tr>
+<th><label for="post_type"><?php _e('Content Types'); ?></label></th>
+<td>
+<select name="export_post_type" id="post_type">
+	<option value="all" selected="selected"><?php _e('All Content'); ?></option>
+	<?php foreach ( get_post_types( array( 'public' => true, 'can_export' => true ), 'objects' ) as $post_type_obj ) { ?>
+		<option value="<?php echo $post_type_obj->name; ?>"><?php echo $post_type_obj->labels->name; ?></option>
+	<?php } ?>
+</select>
+</td>
+</tr>
+<tr>
+<th><label for="status"><?php _e('Statuses'); ?></label></th>
+<td>
+<select name="export_post_status" id="status">
+	<option value="all" selected="selected"><?php _e('All Statuses'); ?></option>
+<?php foreach ( get_post_stati( array( 'internal' => false ), 'objects' ) as $post_status_obj ) { ?>
+	<option value="<?php echo $post_status_obj->name; ?>"><?php echo $post_status_obj->label; ?></option>
+<?php } ?>
+</select>
+</td>
+</tr>
 </table>
-<p class="submit"><input type="submit" name="submit" value="<?php _e('Download Export File'); ?> &raquo;" />
+<p class="submit"><input type="submit" name="submit" class="button" value="<?php esc_attr_e('Download Export File'); ?>" />
 <input type="hidden" name="download" value="true" />
 </p>
 </form>
 </div>
-</div>
 
 <?php
 
-function export_wp() {
-global $wpdb, $post_ids, $post;
-
-do_action('export_wp');
-
-$filename = 'wordpress.' . date('Y-m-d') . '.xml';
-
-header('Content-Description: File Transfer');
-header("Content-Disposition: attachment; filename=$filename");
-header('Content-Type: text/xml; charset=' . get_option('blog_charset'), true);
-
-$where = '';
-if ( isset( $_GET['author'] ) && $_GET['author'] != 'all' ) {
-	$author_id = (int) $_GET['author'];
-	$where = " WHERE post_author = '$author_id' ";
-}
-
-// grab a snapshot of post IDs, just in case it changes during the export
-$post_ids = $wpdb->get_col("SELECT ID FROM $wpdb->posts $where ORDER BY post_date_gmt ASC");
-
-$categories = (array) get_categories('get=all');
-$tags = (array) get_tags('get=all');
-
-function wxr_missing_parents($categories) {
-	if ( !is_array($categories) || empty($categories) )
-		return array();
-
-	foreach ( $categories as $category )
-		$parents[$category->term_id] = $category->parent;
-
-	$parents = array_unique(array_diff($parents, array_keys($parents)));
-
-	if ( $zero = array_search('0', $parents) )
-		unset($parents[$zero]);
-
-	return $parents;
-}
-
-while ( $parents = wxr_missing_parents($categories) ) {
-	$found_parents = get_categories("include=" . join(', ', $parents));
-	if ( is_array($found_parents) && count($found_parents) )
-		$categories = array_merge($categories, $found_parents);
-	else
-		break;
-}
-
-// Put them in order to be inserted with no child going before its parent
-$pass = 0;
-$passes = 1000 + count($categories);
-while ( ( $cat = array_shift($categories) ) && ++$pass < $passes ) {
-	if ( $cat->parent == 0 || isset($cats[$cat->parent]) ) {
-		$cats[$cat->term_id] = $cat;
-	} else {
-		$categories[] = $cat;
-	}
-}
-unset($categories);
-
-function wxr_cdata($str) {
-	if ( seems_utf8($str) == false )
-		$str = utf8_encode($str);
-
-	// $str = ent2ncr(wp_specialchars($str));
-
-	$str = "<![CDATA[$str" . ( ( substr($str, -1) == ']' ) ? ' ' : '') . "]]>";
-
-	return $str;
-}
-
-function wxr_cat_name($c) {
-	if ( empty($c->name) )
-		return;
-
-	echo '<wp:cat_name>' . wxr_cdata($c->name) . '</wp:cat_name>';
-}
-
-function wxr_category_description($c) {
-	if ( empty($c->description) )
-		return;
-
-	echo '<wp:category_description>' . wxr_cdata($c->description) . '</wp:category_description>';
-}
-
-function wxr_tag_name($t) {
-	if ( empty($t->name) )
-		return;
-
-	echo '<wp:tag_name>' . wxr_cdata($t->name) . '</wp:tag_name>';
-}
-
-function wxr_tag_description($t) {
-	if ( empty($t->description) )
-		return;
-
-	echo '<wp:tag_description>' . wxr_cdata($t->description) . '</wp:tag_description>';
-}
-
-function wxr_post_taxonomy() {
-	$categories = get_the_category();
-	$tags = get_the_tags();
-	$cat_names = array();
-	$tag_names = array();
-	$the_list = '';
-	$filter = 'rss';
-
-	if ( !empty($categories) ) foreach ( (array) $categories as $category ) {
-		$cat_name = sanitize_term_field('name', $category->name, $category->term_id, 'category', $filter);
-		$the_list .= "\n\t\t<category><![CDATA[$cat_name]]></category>\n";
-	}
-
-	if ( !empty($tags) ) foreach ( (array) $tags as $tag ) {
-		$tag_name = sanitize_term_field('name', $tag->name, $tag->term_id, 'post_tag', $filter);
-		$the_list .= "\n\t\t<category domain=\"tag\"><![CDATA[$tag_name]]></category>\n";
-	}
-
-	echo $the_list;
-}
-
-echo '<?xml version="1.0" encoding="' . get_bloginfo('charset') . '"?' . ">\n";
-
-?>
-<!-- This is a WordPress eXtended RSS file generated by WordPress as an export of your blog. -->
-<!-- It contains information about your blog's posts, comments, and categories. -->
-<!-- You may use this file to transfer that content from one site to another. -->
-<!-- This file is not intended to serve as a complete backup of your blog. -->
-
-<!-- To import this information into a WordPress blog follow these steps. -->
-<!-- 1. Log into that blog as an administrator. -->
-<!-- 2. Go to Manage: Import in the blog's admin panels. -->
-<!-- 3. Choose "WordPress" from the list. -->
-<!-- 4. Upload this file using the form provided on that page. -->
-<!-- 5. You will first be asked to map the authors in this export file to users -->
-<!--    on the blog.  For each author, you may choose to map to an -->
-<!--    existing user on the blog or to create a new user -->
-<!-- 6. WordPress will then import each of the posts, comments, and categories -->
-<!--    contained in this file into your blog -->
-
-<!-- generator="wordpress/<?php bloginfo_rss('version') ?>" created="<?php echo date('Y-m-d H:i'); ?>"-->
-<rss version="2.0"
-	xmlns:content="http://purl.org/rss/1.0/modules/content/"
-	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
-	xmlns:dc="http://purl.org/dc/elements/1.1/"
-	xmlns:wp="http://wordpress.org/export/1.0/"
->
-
-<channel>
-	<title><?php bloginfo_rss('name'); ?></title>
-	<link><?php bloginfo_rss('url') ?></link>
-	<description><?php bloginfo_rss("description") ?></description>
-	<pubDate><?php echo mysql2date('D, d M Y H:i:s +0000', get_lastpostmodified('GMT'), false); ?></pubDate>
-	<generator>http://wordpress.org/?v=<?php bloginfo_rss('version'); ?></generator>
-	<language><?php echo get_option('rss_language'); ?></language>
-<?php if ( $cats ) : foreach ( $cats as $c ) : ?>
-	<wp:category><wp:category_nicename><?php echo $c->slug; ?></wp:category_nicename><wp:category_parent><?php echo $c->parent ? $cats[$c->parent]->name : ''; ?></wp:category_parent><?php wxr_cat_name($c); ?><?php wxr_category_description($c); ?></wp:category>
-<?php endforeach; endif; ?>
-<?php if ( $tags ) : foreach ( $tags as $t ) : ?>
-	<wp:tag><wp:tag_slug><?php echo $t->slug; ?></wp:tag_slug><?php wxr_tag_name($t); ?><?php wxr_tag_description($t); ?></wp:tag>
-<?php endforeach; endif; ?>
-	<?php do_action('rss2_head'); ?>
-	<?php if ($post_ids) {
-		global $wp_query;
-		$wp_query->in_the_loop = true;  // Fake being in the loop.
-		// fetch 20 posts at a time rather than loading the entire table into memory
-		while ( $next_posts = array_splice($post_ids, 0, 20) ) {
-			$where = "WHERE ID IN (".join(',', $next_posts).")";
-			$posts = $wpdb->get_results("SELECT * FROM $wpdb->posts $where ORDER BY post_date_gmt ASC");
-				foreach ($posts as $post) {
-			setup_postdata($post); ?>
-<item>
-<title><?php the_title_rss() ?></title>
-<link><?php the_permalink_rss() ?></link>
-<pubDate><?php echo mysql2date('D, d M Y H:i:s +0000', get_post_time('Y-m-d H:i:s', true), false); ?></pubDate>
-<dc:creator><?php the_author() ?></dc:creator>
-<?php wxr_post_taxonomy() ?>
-
-<guid isPermaLink="false"><?php the_guid(); ?></guid>
-<description></description>
-<content:encoded><![CDATA[<?php echo $post->post_content ?>]]></content:encoded>
-<wp:post_id><?php echo $post->ID; ?></wp:post_id>
-<wp:post_date><?php echo $post->post_date; ?></wp:post_date>
-<wp:post_date_gmt><?php echo $post->post_date_gmt; ?></wp:post_date_gmt>
-<wp:comment_status><?php echo $post->comment_status; ?></wp:comment_status>
-<wp:ping_status><?php echo $post->ping_status; ?></wp:ping_status>
-<wp:post_name><?php echo $post->post_name; ?></wp:post_name>
-<wp:status><?php echo $post->post_status; ?></wp:status>
-<wp:post_parent><?php echo $post->post_parent; ?></wp:post_parent>
-<wp:menu_order><?php echo $post->menu_order; ?></wp:menu_order>
-<wp:post_type><?php echo $post->post_type; ?></wp:post_type>
-<?php
-$postmeta = $wpdb->get_results("SELECT * FROM $wpdb->postmeta WHERE post_id = $post->ID");
-if ( $postmeta ) {
-?>
-<?php foreach( $postmeta as $meta ) { ?>
-<wp:postmeta>
-<wp:meta_key><?php echo $meta->meta_key; ?></wp:meta_key>
-<wp:meta_value><?Php echo $meta->meta_value; ?></wp:meta_value>
-</wp:postmeta>
-<?php } ?>
-<?php } ?>
-<?php
-$comments = $wpdb->get_results("SELECT * FROM $wpdb->comments WHERE comment_post_ID = $post->ID");
-if ( $comments ) { foreach ( $comments as $c ) { ?>
-<wp:comment>
-<wp:comment_id><?php echo $c->comment_ID; ?></wp:comment_id>
-<wp:comment_author><?php echo wxr_cdata($c->comment_author); ?></wp:comment_author>
-<wp:comment_author_email><?php echo $c->comment_author_email; ?></wp:comment_author_email>
-<wp:comment_author_url><?php echo $c->comment_author_url; ?></wp:comment_author_url>
-<wp:comment_author_IP><?php echo $c->comment_author_IP; ?></wp:comment_author_IP>
-<wp:comment_date><?php echo $c->comment_date; ?></wp:comment_date>
-<wp:comment_date_gmt><?php echo $c->comment_date_gmt; ?></wp:comment_date_gmt>
-<wp:comment_content><?php echo $c->comment_content; ?></wp:comment_content>
-<wp:comment_approved><?php echo $c->comment_approved; ?></wp:comment_approved>
-<wp:comment_type><?php echo $c->comment_type; ?></wp:comment_type>
-<wp:comment_parent><?php echo $c->comment_parent; ?></wp:comment_parent>
-</wp:comment>
-<?php } } ?>
-	</item>
-<?php } } } ?>
-</channel>
-</rss>
-<?php
-	die();
-}
 
 include ('admin-footer.php');
 ?>
