@@ -126,6 +126,8 @@ $_old_files = array(
 'wp-admin/edit-form-ajax-cat.php',
 'wp-admin/execute-pings.php',
 'wp-admin/import/b2.php',
+'wp-admin/import/btt.php',
+'wp-admin/import/jkw.php',
 'wp-admin/inline-uploading.php',
 'wp-admin/link-categories.php',
 'wp-admin/list-manipulation.js',
@@ -229,7 +231,7 @@ function update_core($from, $to) {
 	$result = copy_dir($from . '/wordpress', $to);
 	if ( is_wp_error($result) ) {
 		$wp_filesystem->delete($maintenance_file);
-		//$wp_filesystem->delete($working_dir, true); //TODO: Uncomment? This DOES mean that the new files are available in the upgrade folder if it fails.
+		$wp_filesystem->delete($from, true);
 		return $result;
 	}
 
@@ -250,7 +252,10 @@ function update_core($from, $to) {
 	$wp_filesystem->delete($from, true);
 
 	// Force refresh of update information
-	delete_option('update_core');
+	if ( function_exists('delete_transient') )
+		delete_transient('update_core');
+	else
+		delete_option('update_core');
 
 	// Remove maintenance file, we're done.
 	$wp_filesystem->delete($maintenance_file);
