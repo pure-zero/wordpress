@@ -1,63 +1,173 @@
 <?php
-/**
- * Dashboard Administration Panel
- *
- * @package WordPress
- * @subpackage Administration
- */
-
-/** Load WordPress Bootstrap */
-require_once('./admin.php');
-
-/** Load WordPress dashboard API */
-require_once(ABSPATH . 'wp-admin/includes/dashboard.php');
-
-wp_dashboard_setup();
-
-wp_enqueue_script( 'dashboard' );
-wp_enqueue_script( 'plugin-install' );
-wp_enqueue_script( 'media-upload' );
-wp_admin_css( 'dashboard' );
-wp_admin_css( 'plugin-install' );
-add_thickbox();
-
-$title = __('Dashboard');
-$parent_file = 'index.php';
-
-add_contextual_help($current_screen,
-
-	'<p>' . __('Welcome to your WordPress Dashboard! You will find helpful tips in the Help tab of each screen to assist you as you get to know the application.') . '</p>' .
-	'<p>' . __('The left-hand navigation menu provides links to the administration screens in your WordPress application. You can expand or collapse navigation sections by clicking on the arrow that appears on the right side of each navigation item when you hover over it. You can also minimize the navigation menu to a narrow icon strip by clicking on the separator lines between navigation sections that end in double arrowheads; when minimized, the submenu items will be displayed on hover.') . '</p>' .
-	'<p>' . __('You can configure your dashboard by choosing which modules to display, how many columns to display them in, and where each module should be placed. You can hide/show modules and select the number of columns in the Screen Options tab. To rearrange the modules, drag and drop by clicking on the title bar of the selected module and releasing when you see a gray dotted-line box appear in the location you want to place the module. You can also expand or collapse each module by clicking once on the the module&#8217;s title bar. In addition, some modules are configurable, and will show a &#8220;Configure&#8221; link in the title bar when you hover over it.') . '</p>' .
-	'<p>' . __('The modules on your Dashboard screen are:') . '</p>' .
-	'<p>' . __('<strong>Right Now</strong> - Displays a summary of the content on your site and identifies which theme and version of WordPress you are using.') . '</p>' .
-	'<p>' . __('<strong>Recent Comments</strong> - Shows the most recent comments on your posts (configurable, up to 30) and allows you to moderate them.') . '</p>' .
-	'<p>' . __('<strong>Incoming Links</strong> - Shows links to your site found by Google Blog Search.') . '</p>' .
-	'<p>' . __('<strong>QuickPress</strong> - Allows you to create a new post and either publish it or save it as a draft.') . '</p>' .
-	'<p>' . __('<strong>Recent Drafts</strong> - Displays links to the 5 most recent draft posts you&#8217;ve started.') . '</p>' .
-	'<p>' . __('<strong>Other WordPress News</strong> - Shows the feed from <a href="http://planet.wordpress.org" target="_blank">WordPress Planet</a>. You can configure it to show a different feed of your choosing.') . '</p>' .
-	'<p>' . __('<strong>Plugins</strong> - Features the most popular, newest, and recently updated plugins from the WordPress.org Plugin Directory.') . '</p>' .
-	'<p><strong>' . __('For more information:') . '</strong></p>' .
-	'<p>' . __('<a href="http://codex.wordpress.org/Dashboard_SubPanel" target="_blank">Dashboard Documentation</a>') . '</p>' .
-	'<p>' . __('<a href="http://wordpress.org/support/" target="_blank">Support Forums</a>') . '</p>'
-);
-
-require_once('./admin-header.php');
+require_once('admin.php'); 
+$title = __('Dashboard'); 
+require_once('admin-header.php');
+require_once (ABSPATH . WPINC . '/rss-functions.php');
 
 $today = current_time('mysql', 1);
 ?>
 
 <div class="wrap">
-<?php screen_icon(); ?>
-<h2><?php echo esc_html( $title ); ?></h2>
+<div id="zeitgeist">
+<h2><?php _e('Latest Activity'); ?></h2>
+<?php
+if ( $recentposts = $wpdb->get_results("SELECT ID, post_title FROM $wpdb->posts WHERE post_status = 'publish' AND post_date_gmt < '$today' ORDER BY post_date DESC LIMIT 5") ) :
+?>
+<div>
+<h3><?php _e('Posts'); ?> <a href="edit.php" title="<?php _e('More posts...'); ?>">&raquo;</a></h3>
+<ul>
+<?php
+foreach ($recentposts as $post) {
+	if ($post->post_title == '')
+		$post->post_title = sprintf(__('Post #%s'), $post->ID);
+	echo "<li><a href='post.php?action=edit&amp;post=$post->ID'>";
+	the_title();
+	echo '</a></li>';
+}
+?>
+</ul>
+</div>
+<?php endif; ?>
 
-<div id="dashboard-widgets-wrap">
+<?php
+if ( $scheduled = $wpdb->get_results("SELECT ID, post_title, post_date_gmt FROM $wpdb->posts WHERE post_status = 'publish' AND post_date_gmt > '$today'") ) :
+?> 
+<div>
+<h3><?php _e('Scheduled Entries:') ?></h3>
+<ul>
+<?php
+foreach ($scheduled as $post) {
+	if ($post->post_title == '')
+		$post->post_title = sprintf(__('Post #%s'), $post->ID);
+	echo "<li>" . sprintf(__('%1$s in %2$s'), "<a href='post.php?action=edit&amp;post=$post->ID' title='" . __('Edit this post') . "'>$post->post_title</a>", human_time_diff( current_time('timestamp', 1), strtotime($post->post_date_gmt. ' GMT') ))  . "</li>";
+}
+?> 
+</ul>
+</div>
+<?php endif; ?>
 
-<?php wp_dashboard(); ?>
+<?php
+if ( $comments = $wpdb->get_results("SELECT comment_author, comment_author_url, comment_ID, comment_post_ID FROM $wpdb->comments WHERE comment_approved = '1' ORDER BY comment_date_gmt DESC LIMIT 5") ) :
+?>
+<div>
+<h3><?php _e('Comments'); ?> <a href="edit-comments.php" title="<?php _e('More comments...'); ?>">&raquo;</a></h3>
+<ul>
+<?php 
+foreach ($comments as $comment) {
+	echo '<li>' . sprintf(__('%1$s on %2$s'), get_comment_author_link(), '<a href="'. get_permalink($comment->comment_post_ID) . '#comment-' . $comment->comment_ID . '">' . get_the_title($comment->comment_post_ID) . '</a>');
+	edit_comment_link(__("Edit"), ' <small>(', ')</small>'); 
+	echo '</li>';
+}
+?>
+</ul>
+<?php 
+if ( $numcomments = $wpdb->get_var("SELECT COUNT(*) FROM $tablecomments WHERE comment_approved = '0'") ) :
+?>
+<p><strong><a href="moderation.php"><?php echo sprintf(__('There are comments in moderation (%s)'), number_format($numcomments) ); ?> &raquo;</a></strong></p>
+<?php endif; ?>
+</div>
 
-<div class="clear"></div>
-</div><!-- dashboard-widgets-wrap -->
+<?php endif; ?>
 
-</div><!-- wrap -->
+<div>
+<h3><?php _e('Blog Stats'); ?></h3>
+<?php
+$numposts = $wpdb->get_var("SELECT COUNT(*) FROM $wpdb->posts WHERE post_status = 'publish'");
+if (0 < $numposts) $numposts = number_format($numposts); 
 
-<?php require(ABSPATH . 'wp-admin/admin-footer.php'); ?>
+$numcomms = $wpdb->get_var("SELECT COUNT(*) FROM $wpdb->comments WHERE comment_approved = '1'");
+if (0 < $numcomms) $numcomms = number_format($numcomms);
+
+$numcats = $wpdb->get_var("SELECT COUNT(*) FROM $wpdb->categories");
+if (0 < $numcats) $numcats = number_format($numcats);
+?>
+<p><?php printf(__('There are currently %1$s <a href="%2$s" title="Posts">posts</a> and %3$s <a href="%4$s" title="Comments">comments</a>, contained within %5$s <a href="%6$s" title="categories">categories</a>.'), $numposts, 'edit.php',  $numcomms, 'edit-comments.php', $numcats, 'categories.php'); ?></p>
+</div>
+
+<?php
+$rss = @fetch_rss('http://feeds.technorati.com/cosmos/rss/?url='. trailingslashit(get_option('home')) .'&partner=wordpress');
+if ( isset($rss->items) && 0 != count($rss->items) ) {
+?>
+<div id="incominglinks">
+<h3><?php _e('Incoming Links'); ?> <cite><a href="http://www.technorati.com/cosmos/search.html?url=<?php echo trailingslashit(get_option('home')); ?>&amp;partner=wordpress"><?php _e('More'); ?> &raquo;</a></cite></h3>
+<ul>
+<?php
+$rss->items = array_slice($rss->items, 0, 10);
+foreach ($rss->items as $item ) {
+?>
+	<li><a href="<?php echo wp_filter_kses($item['link']); ?>"><?php echo wp_specialchars($item['title']); ?></a></li>
+<?php } ?>
+</ul>
+</div>
+<?php } ?>
+
+</div>
+
+<h2><?php _e('Dashboard'); ?></h2>
+<p><?php _e('Below is the latest news from the official WordPress development blog, click on a title to read the full entry.'); ?></p>
+<?php
+$rss = @fetch_rss('http://wordpress.org/development/feed/');
+if ( isset($rss->items) && 0 != count($rss->items) ) {
+?>
+<h3>WordPress Development Blog</h3>
+<?php
+$rss->items = array_slice($rss->items, 0, 3);
+foreach ($rss->items as $item ) {
+?>
+<h4><a href='<?php echo wp_filter_kses($item['link']); ?>'><?php echo wp_specialchars($item['title']); ?></a> &#8212; <?php echo human_time_diff( strtotime($item['pubdate'], time() ) ); ?> <?php _e('ago'); ?></h4>
+<p><?php echo $item['description']; ?></p>
+<?php
+	}
+}
+?>
+
+
+<?php
+$rss = @fetch_rss('http://planet.wordpress.org/feed/');
+if ( isset($rss->items) && 0 != count($rss->items) ) {
+?>
+<div id="planetnews">
+<h3><?php _e('Other WordPress News'); ?> <a href="http://planet.wordpress.org/"><?php _e('more'); ?> &raquo;</a></h3>
+<ul>
+<?php
+$rss->items = array_slice($rss->items, 0, 20);
+foreach ($rss->items as $item ) {
+?>
+<li><a href='<?php echo wp_filter_kses($item['link']); ?>'><?php echo wp_specialchars($item['title']); ?></a></li>
+<?php
+	}
+?>
+</ul>
+</div>
+<?php
+}
+?>
+<div style="clear: both">&nbsp;
+<br clear="all" />
+</div>
+</div>
+<?php
+$drafts = $wpdb->get_results("SELECT ID, post_title FROM $wpdb->posts WHERE post_status = 'draft' AND post_author = $user_ID");
+if ($drafts) {
+?>
+<div class="wrap">
+
+    <p><strong><?php _e('Your Drafts:') ?></strong> 
+    <?php
+	$i = 0;
+	foreach ($drafts as $draft) {
+		if (0 != $i)
+			echo ', ';
+		$draft->post_title = stripslashes($draft->post_title);
+		if ($draft->post_title == '')
+			$draft->post_title = sprintf(__('Post #%s'), $draft->ID);
+		echo "<a href='post.php?action=edit&amp;post=$draft->ID' title='" . __('Edit this draft') . "'>$draft->post_title</a>";
+		++$i;
+		}
+	?> 
+    .</p> 
+</div>
+<?php } ?>
+<?php
+require('./admin-footer.php');
+?>

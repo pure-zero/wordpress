@@ -1,16 +1,24 @@
 <?php
-/**
- * WordPress Options Header.
- *
- * Resets variables: 'action', 'standalone', and 'option_group_id'. Displays
- * updated message, if updated variable is part of the URL query.
- *
- * @package WordPress
- * @subpackage Administration
- */
 
-wp_reset_vars(array('action', 'standalone', 'option_group_id'));
-
-settings_errors();
-
+$wpvarstoreset = array('action','standalone', 'option_group_id');
+for ($i=0; $i<count($wpvarstoreset); $i += 1) {
+	$wpvar = $wpvarstoreset[$i];
+	if (!isset($$wpvar)) {
+		if (empty($_POST["$wpvar"])) {
+			if (empty($_GET["$wpvar"])) {
+				$$wpvar = '';
+			} else {
+				$$wpvar = $_GET["$wpvar"];
+			}
+		} else {
+			$$wpvar = $_POST["$wpvar"];
+		}
+	}
+}
 ?>
+
+<br clear="all" />
+
+<?php if (isset($_GET['updated'])) : ?>
+<div class="updated"><p><strong><?php _e('Options saved.') ?></strong></p></div>
+<?php endif; ?>
