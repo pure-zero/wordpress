@@ -11,27 +11,17 @@ class Custom_Image_Header {
 		$page = add_theme_page(__('Custom Image Header'), __('Custom Image Header'), 'edit_themes', 'custom-header', array(&$this, 'admin_page'));
 
 		add_action("admin_print_scripts-$page", array(&$this, 'js_includes'));
-		add_action("admin_head-$page", array(&$this, 'take_action'), 50);
 		add_action("admin_head-$page", array(&$this, 'js'), 50);
 		add_action("admin_head-$page", $this->admin_header_callback, 51);
 	}
 
-	function step() {
-		$step = (int) @$_GET['step'];
-		if ( $step < 1 || 3 < $step )
-			$step = 1;
-		return $step;
-	}
-
 	function js_includes() {
-		$step = $this->step();
-		if ( 1 == $step )
-			wp_enqueue_script('colorpicker');
-		elseif ( 2 == $step )	
-			wp_enqueue_script('cropper');
+		wp_enqueue_script('cropper');
+		wp_enqueue_script('colorpicker');
 	}
 
-	function take_action() {
+	function js() {
+
 		if ( isset( $_POST['textcolor'] ) ) {
 			check_admin_referer('custom-header');
 			if ( 'blank' == $_POST['textcolor'] ) {
@@ -46,91 +36,9 @@ class Custom_Image_Header {
 			check_admin_referer('custom-header');
 			remove_theme_mods();
 		}
-	}
-
-	function js() {
-		$step = $this->step();
-		if ( 1 == $step )
-			$this->js_1();
-		elseif ( 2 == $step )
-			$this->js_2();
-	}
-
-	function js_1() { ?>
+	?>
 <script type="text/javascript">
-	var cp = new ColorPicker();
 
-	function pickColor(color) {
-		$('name').style.color = color;
-		$('desc').style.color = color;
-		$('textcolor').value = color;
-	}
-	function PopupWindow_hidePopup(magicword) {
-		if ( magicword != 'prettyplease' )
-			return false;
-		if (this.divName != null) {
-			if (this.use_gebi) {
-				document.getElementById(this.divName).style.visibility = "hidden";
-			}
-			else if (this.use_css) {
-				document.all[this.divName].style.visibility = "hidden";
-			}
-			else if (this.use_layers) {
-				document.layers[this.divName].visibility = "hidden";
-			}
-		}
-		else {
-			if (this.popupWindow && !this.popupWindow.closed) {
-				this.popupWindow.close();
-				this.popupWindow = null;
-			}
-		}
-		return false;
-	}
-	function colorSelect(t,p) {
-		if ( cp.p == p && document.getElementById(cp.divName).style.visibility != "hidden" ) {
-			cp.hidePopup('prettyplease');
-		} else {
-			cp.p = p;
-			cp.select(t,p);
-		}
-	}
-	function colorDefault() {
-		pickColor('#<?php echo HEADER_TEXTCOLOR; ?>');
-	}
-
-	function hide_text() {
-		$('name').style.display = 'none';
-		$('desc').style.display = 'none';
-		$('pickcolor').style.display = 'none';
-		$('defaultcolor').style.display = 'none';
-		$('textcolor').value = 'blank';
-		$('hidetext').value = '<?php _e('Show Text'); ?>';
-//		$('hidetext').onclick = 'show_text()';
-		Event.observe( $('hidetext'), 'click', show_text );
-	}
-
-	function show_text() {
-		$('name').style.display = 'block';
-		$('desc').style.display = 'block';
-		$('pickcolor').style.display = 'inline';
-		$('defaultcolor').style.display = 'inline';
-		$('textcolor').value = '<?php echo HEADER_TEXTCOLOR; ?>';
-		$('hidetext').value = '<?php _e('Hide Text'); ?>';
-		Event.stopObserving( $('hidetext'), 'click', show_text );
-		Event.observe( $('hidetext'), 'click', hide_text );
-	}
-
-	<?php if ( 'blank' == get_theme_mod('header_textcolor', HEADER_TEXTCOLOR) ) { ?>
-Event.observe( window, 'load', hide_text );
-	<?php } ?>
-
-</script>
-<?php
-	}
-
-	function js_2() { ?>
-<script type="text/javascript">
 	function onEndCrop( coords, dimensions ) {
 		$( 'x1' ).value = coords.x1;
 		$( 'y1' ).value = coords.y1;
@@ -169,6 +77,74 @@ Event.observe( window, 'load', hide_text );
 			)
 		}
 	);
+
+	var cp = new ColorPicker();
+
+	function pickColor(color) {
+		$('name').style.color = color;
+		$('desc').style.color = color;
+		$('textcolor').value = color;
+	}
+	function PopupWindow_hidePopup(magicword) {
+		if ( magicword != 'prettyplease' )
+			return false;
+		if (this.divName != null) {
+			if (this.use_gebi) {
+				document.getElementById(this.divName).style.visibility = "hidden";
+			}
+			else if (this.use_css) {
+				document.all[this.divName].style.visibility = "hidden";
+			}
+			else if (this.use_layers) {
+				document.layers[this.divName].visibility = "hidden";
+			}
+		}
+		else {
+			if (this.popupWindow && !this.popupWindow.closed) {
+				this.popupWindow.close();
+				this.popupWindow = null;
+			}
+		}
+		return false;
+	}
+	function colorSelect(t,p) {
+		if ( cp.p == p && document.getElementById(cp.divName).style.visibility != "hidden" ) {
+			cp.hidePopup('prettyplease');
+		} else {
+			cp.p = p;
+			cp.select(t,p);
+		}
+	}
+	function colorDefault() {
+		pickColor('<?php echo HEADER_TEXTCOLOR; ?>');
+	}
+
+	function hide_text() {
+		$('name').style.display = 'none';
+		$('desc').style.display = 'none';
+		$('pickcolor').style.display = 'none';
+		$('defaultcolor').style.display = 'none';
+		$('textcolor').value = 'blank';
+		$('hidetext').value = '<?php _e('Show Text'); ?>';
+//		$('hidetext').onclick = 'show_text()';
+		Event.observe( $('hidetext'), 'click', show_text );
+	}
+
+	function show_text() {
+		$('name').style.display = 'block';
+		$('desc').style.display = 'block';
+		$('pickcolor').style.display = 'inline';
+		$('defaultcolor').style.display = 'inline';
+		$('textcolor').value = '<?php echo HEADER_TEXTCOLOR; ?>';
+		$('hidetext').value = '<?php _e('Hide Text'); ?>';
+		Event.stopObserving( $('hidetext'), 'click', show_text );
+		Event.observe( $('hidetext'), 'click', hide_text );
+	}
+
+	<?php if ( 'blank' == get_theme_mod('header_textcolor', HEADER_TEXTCOLOR) ) { ?>
+Event.observe( window, 'load', hide_text );
+	<?php } ?>
+
 </script>
 <?php
 	}
@@ -193,7 +169,7 @@ Event.observe( window, 'load', hide_text );
 <input type="button" value="<?php _e('Hide Text'); ?>" onclick="hide_text()" id="hidetext" />
 <input type="button" value="<?php _e('Select a Text Color'); ?>" onclick="colorSelect($('textcolor'), 'pickcolor')" id="pickcolor" /><input type="button" value="<?php _e('Use Original Color'); ?>" onclick="colorDefault()" id="defaultcolor" />
 <?php wp_nonce_field('custom-header') ?>
-<input type="hidden" name="textcolor" id="textcolor" value="#<?php attribute_escape(header_textcolor()) ?>" /><input name="submit" type="submit" value="<?php _e('Save Changes'); ?>" /></form>
+<input type="hidden" name="textcolor" id="textcolor" value="#<?php attribute_escape(header_textcolor()) ?>" /><input name="submit" type="submit" value="<?php _e('Save Changes &raquo;'); ?>" /></form>
 <?php } ?>
 
 <div id="colorPickerDiv" style="z-index: 100;background:#eee;border:1px solid #ccc;position:absolute;visibility:hidden;"> </div>
@@ -207,7 +183,7 @@ Event.observe( window, 'load', hide_text );
 <input type="hidden" name="action" value="save" />
 <?php wp_nonce_field('custom-header') ?>
 <p class="submit">
-<input type="submit" value="<?php _e('Upload'); ?>" />
+<input type="submit" value="<?php _e('Upload &raquo;'); ?>" />
 </p>
 </form>
 
@@ -235,7 +211,6 @@ Event.observe( window, 'load', hide_text );
 		die( $file['error'] );
 
 		$url = $file['url'];
-		$type = $file['type'];
 		$file = $file['file'];
 		$filename = basename($file);
 
@@ -243,20 +218,19 @@ Event.observe( window, 'load', hide_text );
 		$object = array(
 		'post_title' => $filename,
 		'post_content' => $url,
-		'post_mime_type' => $type,
+		'post_mime_type' => 'import',
 		'guid' => $url);
 
 		// Save the data
 		$id = wp_insert_attachment($object, $file);
 
+		$upload = array('file' => $file, 'id' => $id);
+
 		list($width, $height, $type, $attr) = getimagesize( $file );
 
 		if ( $width == HEADER_IMAGE_WIDTH && $height == HEADER_IMAGE_HEIGHT ) {
-			// Add the meta-data
-			wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $file ) );
-
 			set_theme_mod('header_image', clean_url($url));
-			do_action('wp_create_file_in_uploads', $file, $id); // For replication
+			$header = apply_filters('wp_create_file_in_uploads', $file, $id); // For replication
 			return $this->finished();
 		} elseif ( $width > HEADER_IMAGE_WIDTH ) {
 			$oitar = $width / HEADER_IMAGE_WIDTH;
@@ -276,7 +250,7 @@ Event.observe( window, 'load', hide_text );
 <form method="POST" action="<?php echo attribute_escape(add_query_arg('step', 3)) ?>">
 
 <p><?php _e('Choose the part of the image you want to use as your header.'); ?></p>
-<div id="testWrap" style="position: relative">
+<div id="testWrap">
 <img src="<?php echo $url; ?>" id="upload" width="<?php echo $width; ?>" height="<?php echo $height; ?>" />
 </div>
 
@@ -290,7 +264,7 @@ Event.observe( window, 'load', hide_text );
 <input type="hidden" name="attachment_id" id="attachment_id" value="<?php echo $id; ?>" />
 <input type="hidden" name="oitar" id="oitar" value="<?php echo $oitar; ?>" />
 <?php wp_nonce_field('custom-header') ?>
-<input type="submit" value="<?php _e('Crop Header'); ?>" />
+<input type="submit" value="<?php _e('Crop Header &raquo;'); ?>" />
 </p>
 
 </form>
@@ -307,34 +281,22 @@ Event.observe( window, 'load', hide_text );
 			$_POST['height'] = $_POST['height'] * $_POST['oitar'];
 		}
 
-		$original = get_attached_file( $_POST['attachment_id'] );
-
-		$cropped = wp_crop_image($_POST['attachment_id'], $_POST['x1'], $_POST['y1'], $_POST['width'], $_POST['height'], HEADER_IMAGE_WIDTH, HEADER_IMAGE_HEIGHT);
-		$cropped = apply_filters('wp_create_file_in_uploads', $cropped, $_POST['attachment_id']); // For replication
+		$header = wp_crop_image($_POST['attachment_id'], $_POST['x1'], $_POST['y1'], $_POST['width'], $_POST['height'], HEADER_IMAGE_WIDTH, HEADER_IMAGE_HEIGHT);
+		$header = apply_filters('wp_create_file_in_uploads', $header); // For replication
 
 		$parent = get_post($_POST['attachment_id']);
+
 		$parent_url = $parent->guid;
-		$url = str_replace(basename($parent_url), basename($cropped), $parent_url);
 
-		// Construct the object array
-		$object = array(
-			'ID' => $_POST['attachment_id'],
-			'post_title' => basename($cropped),
-			'post_content' => $url,
-			'post_mime_type' => 'image/jpeg',
-			'guid' => $url
-		);
-
-		// Update the attachment
-		wp_insert_attachment($object, $cropped);
-		wp_update_attachment_metadata( $_POST['attachment_id'], wp_generate_attachment_metadata( $_POST['attachment_id'], $cropped ) );
+		$url = str_replace(basename($parent_url), basename($header), $parent_url);
 
 		set_theme_mod('header_image', $url);
 
 		// cleanup
-		$medium = str_replace(basename($original), 'midsize-'.basename($original), $original);
+		$file = get_attached_file( $_POST['attachment_id'] );
+		$medium = str_replace(basename($file), 'midsize-'.basename($file), $file);
 		@unlink( apply_filters( 'wp_delete_file', $medium ) );
-		@unlink( apply_filters( 'wp_delete_file', $original ) );
+		wp_delete_attachment( $_POST['attachment_id'] );
 
 		return $this->finished();
 	}
@@ -351,13 +313,19 @@ Event.observe( window, 'load', hide_text );
 	}
 
 	function admin_page() {
-		$step = $this->step();
-		if ( 1 == $step )
+		if ( !isset( $_GET['step'] ) )
+			$step = 1;
+		else
+			$step = (int) $_GET['step'];
+
+		if ( 1 == $step ) {
 			$this->step_1();
-		elseif ( 2 == $step )
+		} elseif ( 2 == $step ) {
 			$this->step_2();
-		elseif ( 3 == $step )
+		} elseif ( 3 == $step ) {
 			$this->step_3();
+		}
+
 	}
 
 }

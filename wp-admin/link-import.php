@@ -3,8 +3,9 @@
 // Copyright (C) 2002 Mike Little -- mike@zed1.com
 
 require_once('admin.php');
-$parent_file = 'edit.php';
+$parent_file = 'link-manager.php';
 $title = __('Import Blogroll');
+$this_file = 'link-import.php';
 
 $step = $_POST['step'];
 if (!$step) $step = 0;
@@ -29,12 +30,12 @@ switch ($step) {
 <div style="width: 70%; margin: auto; height: 8em;">
 <input type="hidden" name="step" value="1" />
 <input type="hidden" name="MAX_FILE_SIZE" value="30000" />
-<div style="width: 48%;" class="alignleft">
+<div style="width: 48%; float: left;">
 <h3><?php _e('Specify an OPML URL:'); ?></h3>
 <input type="text" name="opml_url" size="50" style="width: 90%;" value="http://" />
 </div>
 
-<div style="width: 48%;" class="alignleft">
+<div style="width: 48%; float: left;">
 <h3><?php _e('Or choose from your local disk:'); ?></h3>
 <input id="userfile" name="userfile" type="file" size="30" />
 </div>
@@ -53,7 +54,7 @@ foreach ($categories as $category) {
 ?>
 </select></p>
 
-<p class="submit"><input type="submit" name="submit" value="<?php _e('Import OPML File') ?>" /></p>
+<p class="submit"><input type="submit" name="submit" value="<?php _e('Import OPML File &raquo;') ?>" /></p>
 </form>
 
 </div>
@@ -122,7 +123,7 @@ else
 } // end else
 
 if ( ! $blogrolling )
-	do_action( 'wp_delete_file', $opml_url);
+	apply_filters( 'wp_delete_file', $opml_url);
 	@unlink($opml_url);
 ?>
 </div>
