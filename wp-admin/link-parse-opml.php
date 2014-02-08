@@ -6,8 +6,8 @@
  * @subpackage Administration
  */
 
-if ( ! defined('ABSPATH') )
-	die();
+/** Load WordPress Bootstrap */
+require_once('../wp-load.php');
 
 global $opml, $map;
 

@@ -168,8 +168,6 @@ function &get_comment(&$comment, $output = OBJECT) {
 /**
  * Retrieve a list of comments.
  *
- * The comment list can be for the blog as a whole or for an individual post.
- *
  * The list of comment arguments are 'status', 'orderby', 'comment_date_gmt',
  * 'order', 'number', 'offset', and 'post_id'.
  *
@@ -254,10 +252,8 @@ function get_comments( $args = '' ) {
 function get_comment_statuses( ) {
 	$status = array(
 		'hold'		=> __('Unapproved'),
-		/* translators: comment status  */
-		'approve'	=> _x('Approved', 'adjective'),
-		/* translators: comment status */
-		'spam'		=> _x('Spam', 'adjective'),
+		'approve'	=> __('Approved'),
+		'spam'		=> _c('Spam|adjective'),
 	);
 
 	return $status;
@@ -371,14 +367,14 @@ function sanitize_comment_cookies() {
 	if ( isset($_COOKIE['comment_author_'.COOKIEHASH]) ) {
 		$comment_author = apply_filters('pre_comment_author_name', $_COOKIE['comment_author_'.COOKIEHASH]);
 		$comment_author = stripslashes($comment_author);
-		$comment_author = esc_attr($comment_author);
+		$comment_author = attribute_escape($comment_author);
 		$_COOKIE['comment_author_'.COOKIEHASH] = $comment_author;
 	}
 
 	if ( isset($_COOKIE['comment_author_email_'.COOKIEHASH]) ) {
 		$comment_author_email = apply_filters('pre_comment_author_email', $_COOKIE['comment_author_email_'.COOKIEHASH]);
 		$comment_author_email = stripslashes($comment_author_email);
-		$comment_author_email = esc_attr($comment_author_email);
+		$comment_author_email = attribute_escape($comment_author_email);
 		$_COOKIE['comment_author_email_'.COOKIEHASH] = $comment_author_email;
 	}
 
@@ -412,9 +408,9 @@ function wp_allow_comment($commentdata) {
 	$dupe .= ") AND comment_content = '$comment_content' LIMIT 1";
 	if ( $wpdb->get_var($dupe) ) {
 		if ( defined('DOING_AJAX') )
-			die( __('Duplicate comment detected; it looks as though you&#8217;ve already said that!') );
+			die( __('Duplicate comment detected; it looks as though you\'ve already said that!') );
 
-		wp_die( __('Duplicate comment detected; it looks as though you&#8217;ve already said that!') );
+		wp_die( __('Duplicate comment detected; it looks as though you\'ve already said that!') );
 	}
 
 	do_action( 'check_comment_flood', $comment_author_IP, $comment_author_email, $comment_date_gmt );
@@ -464,8 +460,8 @@ function check_comment_flood_db( $ip, $email, $date ) {
 	if ( current_user_can( 'manage_options' ) )
 		return; // don't throttle admins
 	if ( $lasttime = $wpdb->get_var( $wpdb->prepare("SELECT comment_date_gmt FROM $wpdb->comments WHERE comment_author_IP = %s OR comment_author_email = %s ORDER BY comment_date DESC LIMIT 1", $ip, $email) ) ) {
-		$time_lastcomment = mysql2date('U', $lasttime, false);
-		$time_newcomment  = mysql2date('U', $date, false);
+		$time_lastcomment = mysql2date('U', $lasttime);
+		$time_newcomment  = mysql2date('U', $date);
 		$flood_die = apply_filters('comment_flood_filter', false, $time_lastcomment, $time_newcomment);
 		if ( $flood_die ) {
 			do_action('comment_flood_trigger', $time_lastcomment, $time_newcomment);
@@ -884,23 +880,20 @@ function wp_insert_comment($commentdata) {
 		$comment_parent = 0;
 	if ( ! isset($comment_approved) )
 		$comment_approved = 1;
-	if ( ! isset($comment_karma) )
-		$comment_karma = 0;
 	if ( ! isset($user_id) )
 		$user_id = 0;
 	if ( ! isset($comment_type) )
 		$comment_type = '';
 
-	$data = compact('comment_post_ID', 'comment_author', 'comment_author_email', 'comment_author_url', 'comment_author_IP', 'comment_date', 'comment_date_gmt', 'comment_content', 'comment_karma', 'comment_approved', 'comment_agent', 'comment_type', 'comment_parent', 'user_id');
-	$wpdb->insert($wpdb->comments, $data);
+	$result = $wpdb->query( $wpdb->prepare("INSERT INTO $wpdb->comments
+	(comment_post_ID, comment_author, comment_author_email, comment_author_url, comment_author_IP, comment_date, comment_date_gmt, comment_content, comment_approved, comment_agent, comment_type, comment_parent, user_id)
+	VALUES (%d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %d, %d)",
+	$comment_post_ID, $comment_author, $comment_author_email, $comment_author_url, $comment_author_IP, $comment_date, $comment_date_gmt, $comment_content, $comment_approved, $comment_agent, $comment_type, $comment_parent, $user_id) );
 
 	$id = (int) $wpdb->insert_id;
 
-	if ( $comment_approved == 1 )
+	if ( $comment_approved == 1)
 		wp_update_comment_count($comment_post_ID);
-
-	$comment = get_comment($id);
-	do_action('wp_insert_comment', $id, $comment);
 
 	return $id;
 }
@@ -1023,26 +1016,24 @@ function wp_new_comment( $commentdata ) {
  *
  * @param int $comment_id Comment ID.
  * @param string $comment_status New comment status, either 'hold', 'approve', 'spam', or 'delete'.
- * @param bool $wp_error Whether to return a WP_Error object if there is a failure. Default is false.
  * @return bool False on failure or deletion and true on success.
  */
-function wp_set_comment_status($comment_id, $comment_status, $wp_error = false) {
+function wp_set_comment_status($comment_id, $comment_status) {
 	global $wpdb;
 
-	$status = '0';
 	switch ( $comment_status ) {
 		case 'hold':
-			$status = '0';
+			$query = $wpdb->prepare("UPDATE $wpdb->comments SET comment_approved='0' WHERE comment_ID = %d LIMIT 1", $comment_id);
 			break;
 		case 'approve':
-			$status = '1';
+			$query = $wpdb->prepare("UPDATE $wpdb->comments SET comment_approved='1' WHERE comment_ID = %d LIMIT 1", $comment_id);
 			if ( get_option('comments_notify') ) {
 				$comment = get_comment($comment_id);
 				wp_notify_postauthor($comment_id, $comment->comment_type);
 			}
 			break;
 		case 'spam':
-			$status = 'spam';
+			$query = $wpdb->prepare("UPDATE $wpdb->comments SET comment_approved='spam' WHERE comment_ID = %d LIMIT 1", $comment_id);
 			break;
 		case 'delete':
 			return wp_delete_comment($comment_id);
@@ -1051,12 +1042,8 @@ function wp_set_comment_status($comment_id, $comment_status, $wp_error = false) 
 			return false;
 	}
 
-	if ( !$wpdb->update( $wpdb->comments, array('comment_approved' => $status), array('comment_ID' => $comment_id) ) ) {
-		if ( $wp_error )
-			return new WP_Error('db_update_error', __('Could not update comment status'), $wpdb->last_error);
-		else
-			return false;
-	}
+	if ( !$wpdb->query($query) )
+		return false;
 
 	clean_comment_cache($comment_id);
 
@@ -1089,9 +1076,8 @@ function wp_update_comment($commentarr) {
 	$comment = get_comment($commentarr['comment_ID'], ARRAY_A);
 
 	// Escape data pulled from DB.
-	$comment = $wpdb->escape($comment);
-
-	$old_status = $comment['comment_approved'];
+	foreach ( (array) $comment as $key => $value )
+		$comment[$key] = $wpdb->escape($value);
 
 	// Merge old and new fields with new fields overwriting old ones.
 	$commentarr = array_merge($comment, $commentarr);
@@ -1112,8 +1098,23 @@ function wp_update_comment($commentarr) {
 	else if ( 'approve' == $comment_approved )
 		$comment_approved = 1;
 
-	$data = compact('comment_content', 'comment_author', 'comment_author_email', 'comment_approved', 'comment_karma', 'comment_author_url', 'comment_date', 'comment_date_gmt');
-	$wpdb->update($wpdb->comments, $data, compact('comment_ID'));
+	$wpdb->query( $wpdb->prepare("UPDATE $wpdb->comments SET
+			comment_content      = %s,
+			comment_author       = %s,
+			comment_author_email = %s,
+			comment_approved     = %s,
+			comment_author_url   = %s,
+			comment_date         = %s,
+			comment_date_gmt     = %s
+		WHERE comment_ID = %d",
+			$comment_content,
+			$comment_author,
+			$comment_author_email,
+			$comment_approved,
+			$comment_author_url,
+			$comment_date,
+			$comment_date_gmt,
+			$comment_ID) );
 
 	$rval = $wpdb->rows_affected;
 
@@ -1121,7 +1122,7 @@ function wp_update_comment($commentarr) {
 	wp_update_comment_count($comment_post_ID);
 	do_action('edit_comment', $comment_ID);
 	$comment = get_comment($comment_ID);
-	wp_transition_comment_status($comment->comment_approved, $old_status, $comment);
+	wp_transition_comment_status($comment_approved, $comment->comment_approved, $comment);
 	return $rval;
 }
 
@@ -1212,7 +1213,7 @@ function wp_update_comment_count_now($post_id) {
 
 	$old = (int) $post->comment_count;
 	$new = (int) $wpdb->get_var( $wpdb->prepare("SELECT COUNT(*) FROM $wpdb->comments WHERE comment_post_ID = %d AND comment_approved = '1'", $post_id) );
-	$wpdb->update( $wpdb->posts, array('comment_count' => $new), array('ID' => $post_id) );
+	$wpdb->query( $wpdb->prepare("UPDATE $wpdb->posts SET comment_count = %d WHERE ID = %d", $new, $post_id) );
 
 	if ( 'page' == $post->post_type )
 		clean_page_cache( $post_id );
@@ -1253,12 +1254,7 @@ function discover_pingback_server_uri($url, $deprecated = 2048) {
 	if ( ! isset( $parsed_url['host'] ) ) // Not an URL. This should never happen.
 		return false;
 
-	//Do not search for a pingback server on our own uploads
-	$uploads_dir = wp_upload_dir();
-	if ( 0 === strpos($url, $uploads_dir['baseurl']) )
-		return false;
-
-	$response = wp_remote_head( $url, array( 'timeout' => 2, 'httpversion' => '1.0' ) );
+	$response = wp_remote_get( $url, array( 'timeout' => 2, 'httpversion' => '1.1' ) );
 
 	if ( is_wp_error( $response ) )
 		return false;
@@ -1268,12 +1264,6 @@ function discover_pingback_server_uri($url, $deprecated = 2048) {
 
 	// Not an (x)html, sgml, or xml page, no use going further.
 	if ( isset( $response['headers']['content-type'] ) && preg_match('#(image|audio|video|model)/#is', $response['headers']['content-type']) )
-		return false;
-
-	// Now do a GET since we're going to look in the html headers (and we're sure its not a binary file)
-	$response = wp_remote_get( $url, array( 'timeout' => 2, 'httpversion' => '1.0' ) );
-
-	if ( is_wp_error( $response ) )
 		return false;
 
 	$contents = $response['body'];
@@ -1344,7 +1334,7 @@ function do_trackbacks($post_id) {
 	$to_ping = get_to_ping($post_id);
 	$pinged  = get_pung($post_id);
 	if ( empty($to_ping) ) {
-		$wpdb->update($wpdb->posts, array('to_ping' => ''), array('ID' => $post_id) );
+		$wpdb->query( $wpdb->prepare("UPDATE $wpdb->posts SET to_ping = '' WHERE ID = %d", $post_id) );
 		return;
 	}
 

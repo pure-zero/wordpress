@@ -4,7 +4,7 @@
  * @subpackage Default_Theme
  */
 ?>
-	<div id="sidebar" role="complementary">
+	<div id="sidebar">
 		<ul>
 			<?php 	/* Widgetized sidebar, if you have the plugin installed. */
 					if ( !function_exists('dynamic_sidebar') || !dynamic_sidebar() ) : ?>
@@ -47,10 +47,8 @@
 
 			<?php } ?>
 
-			</li>
-		<?php }?>
-		</ul>
-		<ul role="navigation">
+			</li> <?php }?>
+
 			<?php wp_list_pages('title_li=<h2>Pages</h2>' ); ?>
 
 			<li><h2>Archives</h2>
@@ -60,8 +58,7 @@
 			</li>
 
 			<?php wp_list_categories('show_count=1&title_li=<h2>Categories</h2>'); ?>
-		</ul>
-		<ul>
+
 			<?php /* If this is the frontpage */ if ( is_home() || is_page() ) { ?>
 				<?php wp_list_bookmarks(); ?>
 
