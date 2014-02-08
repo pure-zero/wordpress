@@ -70,7 +70,7 @@ class Textpattern_Import {
 		echo '<form action="admin.php?import=textpattern&amp;step=1" method="post">';
 		wp_nonce_field('import-textpattern');
 		$this->db_form();
-		echo '<p class="submit"><input type="submit" name="submit" class="button" value="'.esc_attr__('Import').'" /></p>';
+		echo '<p class="submit"><input type="submit" name="submit" class="button" value="'.attribute_escape(__('Import')).'" /></p>';
 		echo '</form>';
 		echo '</div>';
 	}
@@ -201,7 +201,7 @@ class Textpattern_Import {
 
 			// Store category translation for future use
 			add_option('txpcat2wpcat',$txpcat2wpcat);
-			echo '<p>'.sprintf(_n('Done! <strong>%1$s</strong> category imported.', 'Done! <strong>%1$s</strong> categories imported.', $count), $count).'<br /><br /></p>';
+			echo '<p>'.sprintf(__ngettext('Done! <strong>%1$s</strong> category imported.', 'Done! <strong>%1$s</strong> categories imported.', $count), $count).'<br /><br /></p>';
 			return true;
 		}
 		echo __('No Categories to Import!');
@@ -397,24 +397,33 @@ class Textpattern_Import {
 				$web = $wpdb->escape($web);
 				$message = $wpdb->escape($message);
 
-				$comment = array(
-							'comment_post_ID'	=> $comment_post_ID,
-							'comment_author'	=> $name,
-							'comment_author_IP'	=> $ip,
-							'comment_author_email'	=> $email,
-							'comment_author_url'	=> $web,
-							'comment_date'		=> $posted,
-							'comment_content'	=> $message,
-							'comment_approved'	=> $comment_approved);
-				$comment = wp_filter_comment($comment);
-
-				if ( $cinfo = comment_exists($name, $posted) ) {
+				if($cinfo = comment_exists($name, $posted))
+				{
 					// Update comments
-					$comment['comment_ID'] = $cinfo;
-					$ret_id = wp_update_comment($comment);
-				} else {
+					$ret_id = wp_update_comment(array(
+						'comment_ID'			=> $cinfo,
+						'comment_post_ID'		=> $comment_post_ID,
+						'comment_author'		=> $name,
+						'comment_author_email'	=> $email,
+						'comment_author_url'	=> $web,
+						'comment_date'			=> $posted,
+						'comment_content'		=> $message,
+						'comment_approved'		=> $comment_approved)
+						);
+				}
+				else
+				{
 					// Insert comments
-					$ret_id = wp_insert_comment($comment);
+					$ret_id = wp_insert_comment(array(
+						'comment_post_ID'		=> $comment_post_ID,
+						'comment_author'		=> $name,
+						'comment_author_email'	=> $email,
+						'comment_author_url'	=> $web,
+						'comment_author_IP'		=> $ip,
+						'comment_date'			=> $posted,
+						'comment_content'		=> $message,
+						'comment_approved'		=> $comment_approved)
+						);
 				}
 				$txpcm2wpcm[$comment_ID] = $ret_id;
 			}
@@ -477,7 +486,7 @@ class Textpattern_Import {
 			}
 			add_option('txplinks2wplinks',$txplinks2wplinks);
 			echo '<p>';
-			printf(_n('Done! <strong>%s</strong> link imported', 'Done! <strong>%s</strong> links imported', $count), $count);
+			printf(__ngettext('Done! <strong>%s</strong> link imported', 'Done! <strong>%s</strong> links imported', $count), $count);
 			echo '<br /><br /></p>';
 			return true;
 		}
@@ -496,7 +505,7 @@ class Textpattern_Import {
 
 		echo '<form action="admin.php?import=textpattern&amp;step=2" method="post">';
 		wp_nonce_field('import-textpattern');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', esc_attr__('Import Users'));
+		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Import Users')));
 		echo '</form>';
 
 	}
@@ -509,7 +518,7 @@ class Textpattern_Import {
 
 		echo '<form action="admin.php?import=textpattern&amp;step=3" method="post">';
 		wp_nonce_field('import-textpattern');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', esc_attr__('Import Posts'));
+		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Import Posts')));
 		echo '</form>';
 	}
 
@@ -523,7 +532,7 @@ class Textpattern_Import {
 
 		echo '<form action="admin.php?import=textpattern&amp;step=4" method="post">';
 		wp_nonce_field('import-textpattern');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', esc_attr__('Import Comments'));
+		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Import Comments')));
 		echo '</form>';
 	}
 
@@ -535,7 +544,7 @@ class Textpattern_Import {
 
 		echo '<form action="admin.php?import=textpattern&amp;step=5" method="post">';
 		wp_nonce_field('import-textpattern');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', esc_attr__('Import Links'));
+		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Import Links')));
 		echo '</form>';
 	}
 
@@ -548,7 +557,7 @@ class Textpattern_Import {
 
 		echo '<form action="admin.php?import=textpattern&amp;step=6" method="post">';
 		wp_nonce_field('import-textpattern');
-		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', esc_attr__('Finish'));
+		printf('<p class="submit"><input type="submit" name="submit" class="button" value="%s" /></p>', attribute_escape(__('Finish')));
 		echo '</form>';
 	}
 
@@ -573,7 +582,7 @@ class Textpattern_Import {
 	{
 		echo '<p>'.__('Welcome to WordPress.  We hope (and expect!) that you will find this platform incredibly rewarding!  As a new WordPress user coming from Textpattern, there are some things that we would like to point out.  Hopefully, they will help your transition go as smoothly as possible.').'</p>';
 		echo '<h3>'.__('Users').'</h3>';
-		echo '<p>'.sprintf(__('You have already setup WordPress and have been assigned an administrative login and password.  Forget it.  You didn&#8217;t have that login in Textpattern, why should you have it here?  Instead we have taken care to import all of your users into our system.  Unfortunately there is one downside.  Because both WordPress and Textpattern uses a strong encryption hash with passwords, it is impossible to decrypt it and we are forced to assign temporary passwords to all your users.  <strong>Every user has the same username, but their passwords are reset to password123.</strong>  So <a href="%1$s">log in</a> and change it.'), get_bloginfo( 'wpurl' ) . '/wp-login.php').'</p>';
+		echo '<p>'.sprintf(__('You have already setup WordPress and have been assigned an administrative login and password.  Forget it.  You didn&#8217;t have that login in Textpattern, why should you have it here?  Instead we have taken care to import all of your users into our system.  Unfortunately there is one downside.  Because both WordPress and Textpattern uses a strong encryption hash with passwords, it is impossible to decrypt it and we are forced to assign temporary passwords to all your users.  <strong>Every user has the same username, but their passwords are reset to password123.</strong>  So <a href="%1$s">Login</a> and change it.'), get_bloginfo( 'wpurl' ) . '/wp-login.php').'</p>';
 		echo '<h3>'.__('Preserving Authors').'</h3>';
 		echo '<p>'.__('Secondly, we have attempted to preserve post authors.  If you are the only author or contributor to your blog, then you are safe.  In most cases, we are successful in this preservation endeavor.  However, if we cannot ascertain the name of the writer due to discrepancies between database tables, we assign it to you, the administrative user.').'</p>';
 		echo '<h3>'.__('Textile').'</h3>';
@@ -585,7 +594,7 @@ class Textpattern_Import {
 		echo '<li>'.__('<a href="http://wordpress.org/support/">The WordPress support forums</a>').'</li>';
 		echo '<li>'.__('<a href="http://codex.wordpress.org">The Codex (In other words, the WordPress Bible)</a>').'</li>';
 		echo '</ul>';
-		echo '<p>'.sprintf(__('That&#8217;s it! What are you waiting for? Go <a href="%1$s">log in</a>!'), get_bloginfo( 'wpurl' ) . '/wp-login.php').'</p>';
+		echo '<p>'.sprintf(__('That&#8217;s it! What are you waiting for? Go <a href="%1$s">login</a>!'), get_bloginfo( 'wpurl' ) . '/wp-login.php').'</p>';
 	}
 
 	function db_form()

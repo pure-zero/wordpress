@@ -130,38 +130,66 @@ function the_title_rss() {
 }
 
 /**
- * Retrieve the post content for feeds.
+ * Display the post content for the feed.
+ *
+ * For encoding the html or the $encode_html parameter, there are three possible
+ * values. '0' will make urls footnotes and use make_url_footnote(). '1' will
+ * encode special characters and automatically display all of the content. The
+ * value of '2' will strip all HTML tags from the content.
+ *
+ * Also note that you cannot set the amount of words and not set the html
+ * encoding. If that is the case, then the html encoding will default to 2,
+ * which will strip all HTML tags.
+ *
+ * To restrict the amount of words of the content, you can use the cut
+ * parameter. If the content is less than the amount, then there won't be any
+ * dots added to the end. If there is content left over, then dots will be added
+ * and the rest of the content will be removed.
  *
  * @package WordPress
  * @subpackage Feed
- * @since 2.9.0
- * @uses apply_filters() Calls 'the_content_feed' on the content before processing.
- * @see get_the_content()
+ * @since 0.71
+ * @uses apply_filters() Calls 'the_content_rss' on the content before processing.
+ * @see get_the_content() For the $more_link_text, $stripteaser, and $more_file
+ *		parameters.
  *
- * @param string $feed_type The type of feed. rss2 | atom | rss | rdf
+ * @param string $more_link_text Optional. Text to display when more content is available but not displayed.
+ * @param int|bool $stripteaser Optional. Default is 0.
+ * @param string $more_file Optional.
+ * @param int $cut Optional. Amount of words to keep for the content.
+ * @param int $encode_html Optional. How to encode the content.
  */
-function get_the_content_feed($feed_type = null) {
-	if ( !$feed_type )
-		$feed_type = get_default_feed();
+function the_content_rss($more_link_text='(more...)', $stripteaser=0, $more_file='', $cut = 0, $encode_html = 0) {
+	$content = get_the_content($more_link_text, $stripteaser, $more_file);
+	$content = apply_filters('the_content_rss', $content);
+	if ( $cut && !$encode_html )
+		$encode_html = 2;
+	if ( 1== $encode_html ) {
+		$content = wp_specialchars($content);
+		$cut = 0;
+	} elseif ( 0 == $encode_html ) {
+		$content = make_url_footnote($content);
+	} elseif ( 2 == $encode_html ) {
+		$content = strip_tags($content);
+	}
+	if ( $cut ) {
+		$blah = explode(' ', $content);
+		if ( count($blah) > $cut ) {
+			$k = $cut;
+			$use_dotdotdot = 1;
+		} else {
+			$k = count($blah);
+			$use_dotdotdot = 0;
+		}
 
-	$content = apply_filters('the_content', get_the_content());
+		/** @todo Check performance, might be faster to use array slice instead. */
+		for ( $i=0; $i<$k; $i++ )
+			$excerpt .= $blah[$i].' ';
+		$excerpt .= ($use_dotdotdot) ? '...' : '';
+		$content = $excerpt;
+	}
 	$content = str_replace(']]>', ']]&gt;', $content);
-	return apply_filters('the_content_feed', $content, $feed_type);
-}
-
-/**
- * Display the post content for feeds.
- *
- * @package WordPress
- * @subpackage Feed
- * @since 2.9.0
- * @uses apply_filters() Calls 'the_content_feed' on the content before processing.
- * @see get_the_content()
- *
- * @param string $feed_type The type of feed. rss2 | atom | rss | rdf
- */
-function the_content_feed($feed_type = null) {
-	echo get_the_content_feed();
+	echo $content;
 }
 
 /**
@@ -227,7 +255,7 @@ function get_comment_guid($comment_id = null) {
  * @since 1.5.0
  */
 function comment_link() {
-	echo esc_url( get_comment_link() );
+	echo clean_url( get_comment_link() );
 }
 
 /**
@@ -283,12 +311,10 @@ function comment_text_rss() {
  * @since 2.1.0
  * @uses apply_filters()
  *
- * @param string $type Optional, default is the type returned by get_default_feed().
+ * @param string $type Optional, default is 'rss'. Either 'rss', 'atom', or 'rdf'.
  * @return string All of the post categories for displaying in the feed.
  */
-function get_the_category_rss($type = null) {
-	if ( empty($type) )
-		$type = get_default_feed();
+function get_the_category_rss($type = 'rss') {
 	$categories = get_the_category();
 	$tags = get_the_tags();
 	$the_list = '';
@@ -310,11 +336,11 @@ function get_the_category_rss($type = null) {
 
 	foreach ( $cat_names as $cat_name ) {
 		if ( 'rdf' == $type )
-			$the_list .= "\t\t<dc:subject><![CDATA[$cat_name]]></dc:subject>\n";
+			$the_list .= "\n\t\t<dc:subject><![CDATA[$cat_name]]></dc:subject>\n";
 		elseif ( 'atom' == $type )
-			$the_list .= sprintf( '<category scheme="%1$s" term="%2$s" />', esc_attr( apply_filters( 'get_bloginfo_rss', get_bloginfo( 'url' ) ) ), esc_attr( $cat_name ) );
+			$the_list .= sprintf( '<category scheme="%1$s" term="%2$s" />', attribute_escape( apply_filters( 'get_bloginfo_rss', get_bloginfo( 'url' ) ) ), attribute_escape( $cat_name ) );
 		else
-			$the_list .= "\t\t<category><![CDATA[" . @html_entity_decode( $cat_name, ENT_COMPAT, get_option('blog_charset') ) . "]]></category>\n";
+			$the_list .= "\n\t\t<category><![CDATA[" . html_entity_decode( $cat_name ) . "]]></category>\n";
 	}
 
 	return apply_filters('the_category_rss', $the_list, $type);
@@ -328,9 +354,9 @@ function get_the_category_rss($type = null) {
  * @since 0.71
  * @see get_the_category_rss() For better explanation.
  *
- * @param string $type Optional, default is the type returned by get_default_feed().
+ * @param string $type Optional, default is 'rss'. Either 'rss', 'atom', or 'rdf'.
  */
-function the_category_rss($type = null) {
+function the_category_rss($type = 'rss') {
 	echo get_the_category_rss($type);
 }
 
@@ -477,7 +503,7 @@ function prep_atom_text_construct($data) {
 function self_link() {
 	$host = @parse_url(get_option('home'));
 	$host = $host['host'];
-	echo esc_url(
+	echo clean_url(
 		'http'
 		. ( (isset($_SERVER['https']) && $_SERVER['https'] == 'on') ? 's' : '' ) . '://'
 		. $host
@@ -485,51 +511,4 @@ function self_link() {
 		);
 }
 
-/**
- * Return the content type for specified feed type.
- *
- * @package WordPress
- * @subpackage Feed
- * @since 2.8.0
- */
-function feed_content_type( $type = '' ) {
-	if ( empty($type) )
-		$type = get_default_feed();
-
-	$types = array(
-		'rss'  => 'application/rss+xml',
-		'rss2' => 'application/rss+xml',
-		'rss-http'  => 'text/xml',
-		'atom' => 'application/atom+xml',
-		'rdf'  => 'application/rdf+xml'
-	);
-
-	$content_type = ( !empty($types[$type]) ) ? $types[$type] : 'application/octet-stream';
-
-	return apply_filters( 'feed_content_type', $content_type, $type );
-}
-
-/**
- * Build SimplePie object based on RSS or Atom feed from URL.
- *
- * @since 2.8
- *
- * @param string $url URL to retrieve feed
- * @return WP_Error|SimplePie WP_Error object on failure or SimplePie object on success
- */
-function fetch_feed($url) {
-	require_once (ABSPATH . WPINC . '/class-feed.php');
-
-	$feed = new SimplePie();
-	$feed->set_feed_url($url);
-	$feed->set_cache_class('WP_Feed_Cache');
-	$feed->set_file_class('WP_SimplePie_File');
-	$feed->set_cache_duration(apply_filters('wp_feed_cache_transient_lifetime', 43200));
-	$feed->init();
-	$feed->handle_content_type();
-
-	if ( $feed->error() )
-		return new WP_Error('simplepie-error', $feed->error());
-
-	return $feed;
-}
+?>
