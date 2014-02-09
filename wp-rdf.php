@@ -1,12 +1,10 @@
-<?php
-/**
- * Redirects to the RDF feed
- * This file is deprecated and only exists for backwards compatibility
- *
- * @package WordPress
- */
+<?php /* RDF 1.0 generator, original version by garym@teledyn.com */
 
-require( './wp-load.php' );
-wp_redirect( get_bloginfo( 'rdf_url' ), 301 );
-exit;
+if (empty($wp)) {
+	require_once('./wp-config.php');
+	wp('feed=rdf');
+}
+
+require (ABSPATH . WPINC . '/feed-rdf.php');
+
 ?>
