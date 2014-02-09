@@ -1,10 +1,11 @@
 /**
- * $Id: validate.js 673 2008-03-06 13:26:20Z spocke $
+ * validate.js
  *
- * Various form validation methods.
+ * Copyright 2009, Moxiecode Systems AB
+ * Released under LGPL License.
  *
- * @author Moxiecode
- * @copyright Copyright © 2004-2008, Moxiecode Systems AB, All rights reserved.
+ * License: http://tinymce.moxiecode.com/license
+ * Contributing: http://tinymce.moxiecode.com/contributing
  */
 
 /**
@@ -110,7 +111,7 @@ var AutoValidator = {
 	},
 
 	reset : function(e) {
-		var t = new Array('label', 'input', 'select', 'textarea');
+		var t = ['label', 'input', 'select', 'textarea'];
 		var i, j, nl, s = this.settings;
 
 		if (e == null)
