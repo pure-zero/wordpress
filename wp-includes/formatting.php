@@ -17,7 +17,7 @@ function wptexturize($text) {
 		$cockneyreplace = array("&#8217;tain&#8217;t","&#8217;twere","&#8217;twas","&#8217;tis","&#8217;twill","&#8217;til","&#8217;bout","&#8217;nuff","&#8217;round","&#8217;cause");
 	}
 
-	$static_characters = array_merge(array('---', ' -- ', '--', 'xn&#8211;', '...', '``', '\'s', '\'\'', ' (tm)'), $cockney); 
+	$static_characters = array_merge(array('---', ' -- ', '--', 'xn&#8211;', '...', '``', '\'s', '\'\'', ' (tm)'), $cockney);
 	$static_replacements = array_merge(array('&#8212;', ' &#8212; ', '&#8211;', 'xn--', '&#8230;', '&#8220;', '&#8217;s', '&#8221;', ' &#8482;'), $cockneyreplace);
 
 	$dynamic_characters = array('/\'(\d\d(?:&#8217;|\')?s)/', '/(\s|\A|")\'/', '/(\d+)"/', '/(\d+)\'/', '/(\S)\'([^\'\s])/', '/(\s|\A)"(?!\s)/', '/"(\s|\S|\Z)/', '/\'([\s.]|\Z)/', '/(\d+)x(\d+)/');
@@ -44,10 +44,18 @@ function wptexturize($text) {
   	return $output;
 }
 
-function clean_pre($text) {
+// Accepts matches array from preg_replace_callback in wpautop()
+// or a string
+function clean_pre($matches) {
+	if ( is_array($matches) )
+		$text = $matches[1] . $matches[2] . "</pre>";
+	else
+		$text = $matches;
+
 	$text = str_replace('<br />', '', $text);
 	$text = str_replace('<p>', "\n", $text);
 	$text = str_replace('</p>', '', $text);
+
 	return $text;
 }
 
@@ -71,14 +79,14 @@ function wpautop($pee, $br = 1) {
 	$pee = preg_replace('!<p>\s*(</?' . $allblocks . '[^>]*>)!', "$1", $pee);
 	$pee = preg_replace('!(</?' . $allblocks . '[^>]*>)\s*</p>!', "$1", $pee);
 	if ($br) {
-		$pee = preg_replace('/<(script|style).*?<\/\\1>/se', 'str_replace("\n", "<WPPreserveNewline />", "\\0")', $pee);
+		$pee = preg_replace_callback('/<(script|style).*?<\/\\1>/s', create_function('$matches', 'return str_replace("\n", "<WPPreserveNewline />", $matches[0]);'), $pee);
 		$pee = preg_replace('|(?<!<br />)\s*\n|', "<br />\n", $pee); // optionally make line breaks
 		$pee = str_replace('<WPPreserveNewline />', "\n", $pee);
 	}
 	$pee = preg_replace('!(</?' . $allblocks . '[^>]*>)\s*<br />!', "$1", $pee);
 	$pee = preg_replace('!<br />(\s*</?(?:p|li|div|dl|dd|dt|th|pre|td|ul|ol)[^>]*>)!', '$1', $pee);
 	if (strpos($pee, '<pre') !== false)
-		$pee = preg_replace('!(<pre.*?>)(.*?)</pre>!ise', " stripslashes('$1') .  stripslashes(clean_pre('$2'))  . '</pre>' ", $pee);
+		$pee = preg_replace_callback('!(<pre.*?>)(.*?)</pre>!is', 'clean_pre', $pee );
 	$pee = preg_replace( "|\n</p>$|", '</p>', $pee );
 
 	return $pee;
@@ -131,7 +139,7 @@ function utf8_uri_encode( $utf8_string, $length = 0 ) {
 
 		if ( $value < 128 ) {
 			if ( $length && ( strlen($unicode) + 1 > $length ) )
-				break; 
+				break;
 			$unicode .= chr($value);
 		} else {
 			if ( count( $values ) == 0 ) $num_octets = ( $value < 224 ) ? 2 : 3;
@@ -413,8 +421,14 @@ function funky_javascript_fix($text) {
 	return $text;
 }
 
+function balanceTags( $text, $force = false ) {
+	if ( !$force && get_option('use_balanceTags') == 0 )
+		return $text;
+	return force_balance_tags( $text );
+}
+
 /*
- balanceTags
+ force_balance_tags
 
  Balances Tags of string using a modified stack.
 
@@ -433,12 +447,10 @@ function funky_javascript_fix($text) {
 	     Added Cleaning Hooks
 	1.0  First Version
 */
-function balanceTags($text, $force = false) {
-
-	if ( !$force && get_option('use_balanceTags') == 0 )
-		return $text;
-
+function force_balance_tags( $text ) {
 	$tagstack = array(); $stacksize = 0; $tagqueue = ''; $newtext = '';
+	$single_tags = array('br', 'hr', 'img', 'input'); //Known single-entity/self-closing tags
+	$nestable_tags = array('blockquote', 'div', 'span'); //Tags that can be immediately nested within themselves
 
 	# WP bug fix for comments - in case you REALLY meant to type '< !--'
 	$text = str_replace('< !--', '<    !--', $text);
@@ -489,11 +501,11 @@ function balanceTags($text, $force = false) {
 			if((substr($regex[2],-1) == '/') || ($tag == '')) {
 			}
 			// ElseIf it's a known single-entity tag but it doesn't close itself, do so
-			elseif ($tag == 'br' || $tag == 'img' || $tag == 'hr' || $tag == 'input') {
+			elseif ( in_array($tag, $single_tags) ) {
 				$regex[2] .= '/';
 			} else {	// Push the tag onto the stack
 				// If the top of the stack is the same as the tag we want to push, close previous tag
-				if (($stacksize > 0) && ($tag != 'div') && ($tagstack[$stacksize - 1] == $tag)) {
+				if (($stacksize > 0) && !in_array($tag, $nestable_tags) && ($tagstack[$stacksize - 1] == $tag)) {
 					$tagqueue = '</' . array_pop ($tagstack) . '>';
 					$stacksize--;
 				}
@@ -532,10 +544,6 @@ function balanceTags($text, $force = false) {
 	$newtext = str_replace("<    !--","< !--",$newtext);
 
 	return $newtext;
-}
-
-function force_balance_tags($text) {
-	return balanceTags($text, true);
 }
 
 function format_to_edit($content, $richedit = false) {
@@ -614,18 +622,35 @@ function antispambot($emailaddy, $mailto=0) {
 	return $emailNOSPAMaddy;
 }
 
+function _make_url_clickable_cb($matches) {
+	$url = $matches[2];
+	$url = clean_url($url);
+	if ( empty($url) )
+		return $matches[0];
+	return $matches[1] . "<a href=\"$url\" rel=\"nofollow\">$url</a>";
+}
+
+function _make_web_ftp_clickable_cb($matches) {
+	$dest = $matches[2];
+	$dest = 'http://' . $dest;
+	$dest = clean_url($dest);
+	if ( empty($dest) )
+		return $matches[0];
+
+	return $matches[1] . "<a href=\"$dest\" rel=\"nofollow\">$dest</a>";
+}
+
+function _make_email_clickable_cb($matches) {
+	$email = $matches[2] . '@' . $matches[3];
+	return $matches[1] . "<a href=\"mailto:$email\">$email</a>";
+}
+
 function make_clickable($ret) {
 	$ret = ' ' . $ret;
 	// in testing, using arrays here was found to be faster
-	$ret = preg_replace(
-		array(
-			'#([\s>])([\w]+?://[\w\#$%&~/.\-;:=,?@\[\]+]*)#is',
-			'#([\s>])((www|ftp)\.[\w\#$%&~/.\-;:=,?@\[\]+]*)#is',
-			'#([\s>])([a-z0-9\-_.]+)@([^,< \n\r]+)#i'),
-		array(
-			'$1<a href="$2" rel="nofollow">$2</a>',
-			'$1<a href="http://$2" rel="nofollow">$2</a>',
-			'$1<a href="mailto:$2@$3">$2@$3</a>'),$ret);
+	$ret = preg_replace_callback('#([\s>])([\w]+?://[\w\#$%&~/.\-;:=,?@\[\]+]*)#is', '_make_url_clickable_cb', $ret);
+	$ret = preg_replace_callback('#([\s>])((www|ftp)\.[\w\#$%&~/.\-;:=,?@\[\]+]*)#is', '_make_web_ftp_clickable_cb', $ret);
+	$ret = preg_replace_callback('#([\s>])([.0-9a-z_+-]+)@(([0-9a-z-]+\.)+[0-9a-z]{2,})#i', '_make_email_clickable_cb', $ret);
 	// this one is not in an array because we need it to run last, for cleanup of accidental links within links
 	$ret = preg_replace("#(<a( [^>]+?>|>))<a [^>]+?>([^>]+?)</a></a>#i", "$1$3</a>", $ret);
 	$ret = trim($ret);
@@ -653,13 +678,13 @@ function convert_smilies($text) {
 	if (get_option('use_smilies')) {
 		// HTML loop taken from texturize function, could possible be consolidated
 		$textarr = preg_split("/(<.*>)/U", $text, -1, PREG_SPLIT_DELIM_CAPTURE); // capture the tags as well as in between
-		$stop = count($textarr);// loop stuff 
-		for ($i = 0; $i < $stop; $i++) { 
-			$content = $textarr[$i]; 
-			if ((strlen($content) > 0) && ('<' != $content{0})) { // If it's not a tag 
-				$content = preg_replace($wp_smiliessearch, $wp_smiliesreplace, $content); 
-			} 
-			$output .= $content; 
+		$stop = count($textarr);// loop stuff
+		for ($i = 0; $i < $stop; $i++) {
+			$content = $textarr[$i];
+			if ((strlen($content) > 0) && ('<' != $content{0})) { // If it's not a tag
+				$content = preg_replace($wp_smiliessearch, $wp_smiliesreplace, $content);
+			}
+			$output .= $content;
 		}
 	} else {
 		// return default text.
@@ -1079,23 +1104,36 @@ function wp_richedit_pre($text) {
 	return apply_filters('richedit_pre', $output);
 }
 
-function clean_url( $url, $protocols = null ) {
+function clean_url( $url, $protocols = null, $context = 'display' ) {
+	$original_url = $url;
+
 	if ('' == $url) return $url;
-	$url = preg_replace('|[^a-z0-9-~+_.?#=!&;,/:%]|i', '', $url);
+	$url = preg_replace('|[^a-z0-9-~+_.?#=!&;,/:%@]|i', '', $url);
 	$strip = array('%0d', '%0a');
 	$url = str_replace($strip, '', $url);
 	$url = str_replace(';//', '://', $url);
-	// Append http unless a relative link starting with / or a php file.
-	if ( strpos($url, '://') === false &&
+	/* If the URL doesn't appear to contain a scheme, we
+	 * presume it needs http:// appended (unless a relative
+	 * link starting with / or a php file).
+	*/
+	if ( strpos($url, ':') === false &&
 		substr( $url, 0, 1 ) != '/' && !preg_match('/^[a-z0-9-]+?\.php/i', $url) )
 		$url = 'http://' . $url;
-	
-	$url = preg_replace('/&([^#])(?![a-z]{2,8};)/', '&#038;$1', $url);
+
+	// Replace ampersands ony when displaying.
+	if ( 'display' == $context )
+		$url = preg_replace('/&([^#])(?![a-z]{2,8};)/', '&#038;$1', $url);
+
 	if ( !is_array($protocols) )
-		$protocols = array('http', 'https', 'ftp', 'ftps', 'mailto', 'news', 'irc', 'gopher', 'nntp', 'feed', 'telnet'); 
+		$protocols = array('http', 'https', 'ftp', 'ftps', 'mailto', 'news', 'irc', 'gopher', 'nntp', 'feed', 'telnet');
 	if ( wp_kses_bad_protocol( $url, $protocols ) != $url )
 		return '';
-	return $url;
+
+	return apply_filters('clean_url', $url, $original_url, $context);
+}
+
+function sanitize_url( $url, $protocols = null ) {
+	return clean_url( $url, $protocols, 'db');
 }
 
 // Borrowed from the PHP Manual user notes. Convert entities, while
@@ -1191,6 +1229,7 @@ function sanitize_option($option, $value) { // Remember to call stripslashes!
 			$value = clean_url($value);
 			break;
 		default :
+			$value = apply_filters("sanitize_option_{$option}", $value, $option);
 			break;
 	}
 
@@ -1202,6 +1241,17 @@ function wp_parse_str( $string, &$array ) {
 	if ( get_magic_quotes_gpc() )
 		$array = stripslashes_deep( $array ); // parse_str() adds slashes if magicquotes is on.  See: http://php.net/parse_str
 	$array = apply_filters( 'wp_parse_str', $array );
+}
+
+// Convert lone less than signs.  KSES already converts lone greater than signs.
+function wp_pre_kses_less_than( $text ) {
+	return preg_replace_callback('%<[^>]*?((?=<)|>|$)%', 'wp_pre_kses_less_than_callback', $text);
+}
+
+function wp_pre_kses_less_than_callback( $matches ) {
+	if ( false === strpos($matches[0], '>') )
+		return wp_specialchars($matches[0]);
+	return $matches[0];
 }
 
 ?>
