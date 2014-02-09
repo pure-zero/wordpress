@@ -13,13 +13,13 @@ function wp_upload_display( $dims = false, $href = '' ) {
 	}
 	if ( isset($attachment_data['width']) )
 		list($width,$height) = wp_shrink_dimensions($attachment_data['width'], $attachment_data['height'], 171, 128);
-		
+
 	ob_start();
 		the_title();
 		$post_title = attribute_escape(ob_get_contents());
 	ob_end_clean();
-	$post_content = apply_filters( 'content_edit_pre', $post->post_content );
-	
+	$post_content = attribute_escape(apply_filters( 'content_edit_pre', $post->post_content ));
+
 	$class = 'text';
 	$innerHTML = get_attachment_innerHTML( $id, false, $dims );
 	if ( $image_src = get_attachment_icon_src() ) {
@@ -35,7 +35,7 @@ function wp_upload_display( $dims = false, $href = '' ) {
 	$r = '';
 
 	if ( $href )
-		$r .= "<a id='file-link-$id' href='" . clean_url($href) ."' title='$post_title' class='file-link $class'>\n";
+		$r .= "<a id='file-link-$id' href='$href' title='$post_title' class='file-link $class'>\n";
 	if ( $href || $image_src )
 		$r .= "\t\t\t$innerHTML";
 	if ( $href )
@@ -105,8 +105,9 @@ function wp_upload_form() {
 	$id = get_the_ID();
 	global $post_id, $tab, $style;
 	$enctype = $id ? '' : ' enctype="multipart/form-data"';
+	$post_id = (int) $post_id;
 ?>
-	<form<?php echo $enctype; ?> id="upload-file" method="post" action="<?php echo get_option('siteurl') . "/wp-admin/upload.php?style=$style&amp;tab=upload&amp;post_id=$post_id"; ?>">
+	<form<?php echo $enctype; ?> id="upload-file" method="post" action="<?php echo get_option('siteurl') . '/wp-admin/upload.php?style=' . attribute_escape($style . '&amp;tab=upload&amp;post_id=' . $post_id); ?>">
 <?php
 	if ( $id ) :
 		$attachment = get_post_to_edit( $id );
@@ -201,7 +202,7 @@ function wp_upload_tab_upload_action() {
 
 		if ( !current_user_can( 'upload_files' ) )
 			wp_die( __('You are not allowed to upload files.')
-				. " <a href='" . get_option('siteurl') . "/wp-admin/upload.php?style=$style&amp;tab=browse-all&amp;post_id=$post_id'>"
+				. " <a href='" . get_option('siteurl') . "/wp-admin/upload.php?style=" . attribute_escape($style . "&amp;tab=browse-all&amp;post_id=$post_id") . "'>"
 				. __('Browse Files') . '</a>'
 			);
 
@@ -211,7 +212,7 @@ function wp_upload_tab_upload_action() {
 
 		if ( isset($file['error']) )
 			wp_die($file['error'] . "<br /><a href='" . get_option('siteurl')
-			. "/wp-admin/upload.php?style=$style&amp;tab=$from_tab&amp;post_id=$post_id'>" . __('Back to Image Uploading') . '</a>'
+			. "/wp-admin/upload.php?style=" . attribute_escape($style . "&amp;tab=$from_tab&amp;post_id=$post_id") . "'>" . __('Back to Image Uploading') . '</a>'
 		);
 
 		$url = $file['url'];
@@ -258,7 +259,7 @@ function wp_upload_tab_upload_action() {
 
 		if ( !current_user_can('edit_post', (int) $ID) )
 			wp_die( __('You are not allowed to delete this attachment.')
-				. " <a href='" . get_option('siteurl') . "/wp-admin/upload.php?style=$style&amp;tab=$from_tab&amp;post_id=$post_id'>"
+				. " <a href='" . get_option('siteurl') . "/wp-admin/upload.php?style=" . attribute_escape($style . "&amp;tab=$from_tab&amp;post_id=$post_id") . "'>"
 				. __('Go back') . '</a>'
 			);
 
@@ -285,7 +286,7 @@ function wp_upload_posts_where( $where ) {
 function wp_upload_tab_browse() {
 	global $wpdb, $action, $paged;
 	$old_vars = compact( 'paged' );
-	
+
 	switch ( $action ) :
 	case 'edit' :
 	case 'view' :
@@ -355,3 +356,5 @@ function wp_upload_admin_head() {
 		echo "</style>";
 	}
 }
+
+?>

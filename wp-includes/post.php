@@ -74,13 +74,13 @@ function &get_children($args = '', $output = OBJECT) {
 // get extended entry info (<!--more-->)
 function get_extended($post) {
 	//Match the new style more links
-	if ( preg_match('/<!--more(.*?)-->/', $post, $matches) ) {
+	if ( preg_match('/<!--more(.*?)?-->/', $post, $matches) ) {
 		list($main, $extended) = explode($matches[0], $post, 2);
 	} else {
 		$main = $post;
 		$extended = '';
 	}
-	
+
 	// Strip leading and trailing whitespace
 	$main = preg_replace('/^[\s]*(.*)[\s]*$/', '\\1', $main);
 	$extended = preg_replace('/^[\s]*(.*)[\s]*$/', '\\1', $extended);
@@ -106,10 +106,10 @@ function &get_post(&$post, $output = OBJECT) {
 		$_post = & $post_cache[$blog_id][$post->ID];
 	} else {
 		$post = (int) $post;
-		if ( $_post = wp_cache_get($post, 'pages') )
-			return get_page($_post, $output);
-		elseif ( isset($post_cache[$blog_id][$post]) )
+		if ( isset($post_cache[$blog_id][$post]) )
 			$_post = & $post_cache[$blog_id][$post];
+		elseif ( $_post = wp_cache_get($post, 'pages') )
+			return get_page($_post, $output);
 		else {
 			$query = "SELECT * FROM $wpdb->posts WHERE ID = '$post' LIMIT 1";
 			$_post = & $wpdb->get_row($query);
@@ -182,7 +182,7 @@ function get_posts($args) {
 		'orderby' => 'post_date', 'order' => 'DESC', 'include' => '', 'exclude' => '',
 		'meta_key' => '', 'meta_value' =>'', 'post_type' => 'post', 'post_status' => 'publish', 'post_parent' => 0);
 	$r = array_merge($defaults, $r);
-	extract($r);
+	extract($r, EXTR_SKIP);
 	$numberposts = (int) $numberposts;
 	$offset = (int) $offset;
 	$category = (int) $category;
@@ -435,6 +435,8 @@ function wp_delete_post($postid = 0) {
 		$wp_rewrite->flush_rules();
 	}
 
+	do_action('deleted_post', $postid);
+	
 	return $post;
 }
 
@@ -488,7 +490,7 @@ function wp_insert_post($postarr = array()) {
 		$postarr = get_object_vars($postarr);
 
 	// export array as variables
-	extract($postarr);
+	extract($postarr, EXTR_SKIP);
 
 	// Are we updating or creating?
 	$update = false;
@@ -553,7 +555,7 @@ function wp_insert_post($postarr = array()) {
 		if ( 'draft' != $post_status )
 			$post_date_gmt = get_gmt_from_date($post_date);
 	}
-		
+
 	if ( 'publish' == $post_status ) {
 		$now = gmdate('Y-m-d H:i:59');
 		if ( mysql2date('U', $post_date_gmt) > mysql2date('U', $now) )
@@ -670,6 +672,8 @@ function wp_insert_post($postarr = array()) {
 		do_action('publish_post', $post_ID);
 		if ( defined('XMLRPC_REQUEST') )
 			do_action('xmlrpc_publish_post', $post_ID);
+		if ( defined('APP_REQUEST') )
+			do_action('app_publish_post', $post_ID);
 
 		if ( !defined('WP_IMPORTING') ) {
 			if ( $post_pingback )
@@ -700,7 +704,7 @@ function wp_insert_post($postarr = array()) {
 	// Schedule publication.
 	if ( 'future' == $post_status )
 		wp_schedule_single_event(strtotime($post_date_gmt. ' GMT'), 'publish_future_post', array($post_ID));
-		
+
 	do_action('save_post', $post_ID);
 	do_action('wp_insert_post', $post_ID);
 
@@ -877,7 +881,7 @@ function trackback_url_list($tb_list, $post_id) {
 		$postdata = wp_get_single_post($post_id, ARRAY_A);
 
 		// import postdata as variables
-		extract($postdata);
+		extract($postdata, EXTR_SKIP);
 
 		// form an excerpt
 		$excerpt = strip_tags($post_excerpt?$post_excerpt:$post_content);
@@ -903,7 +907,7 @@ function get_all_page_ids() {
 
 	if ( ! $page_ids = wp_cache_get('all_page_ids', 'pages') ) {
 		$page_ids = $wpdb->get_col("SELECT ID FROM $wpdb->posts WHERE post_type = 'page'");
-		wp_cache_set('all_page_ids', $page_ids, 'pages');
+		wp_cache_add('all_page_ids', $page_ids, 'pages');
 	}
 
 	return $page_ids;
@@ -946,7 +950,7 @@ function &get_page(&$page, $output = OBJECT) {
 					return get_post($_page, $output);
 				// Potential issue: we're not checking to see if the post_type = 'page'
 				// So all non-'post' posts will get cached as pages.
-				wp_cache_set($_page->ID, $_page, 'pages');
+				wp_cache_add($_page->ID, $_page, 'pages');
 			}
 		}
 	}
@@ -1063,7 +1067,7 @@ function &get_pages($args = '') {
 	$defaults = array('child_of' => 0, 'sort_order' => 'ASC', 'sort_column' => 'post_title',
 				'hierarchical' => 1, 'exclude' => '', 'include' => '', 'meta_key' => '', 'meta_value' => '', 'authors' => '');
 	$r = array_merge($defaults, $r);
-	extract($r);
+	extract($r, EXTR_SKIP);
 
 	$key = md5( serialize( $r ) );
 	if ( $cache = wp_cache_get( 'get_pages', 'page' ) )
@@ -1107,7 +1111,7 @@ function &get_pages($args = '') {
 	$author_query = '';
 	if (!empty($authors)) {
 		$post_authors = preg_split('/[\s,]+/',$authors);
-		
+
 		if ( count($post_authors) ) {
 			foreach ( $post_authors as $post_author ) {
 				//Do we have an author id or an author login?
@@ -1198,9 +1202,9 @@ function generate_page_uri_index() {
 //
 
 function is_local_attachment($url) {
-	if ( !strstr($url, get_bloginfo('home') ) )
+	if (strpos($url, get_bloginfo('url')) === false)
 		return false;
-	if ( strstr($url, get_bloginfo('home') . '/?attachment_id=') )
+	if (strpos($url, get_bloginfo('url') . '/?attachment_id=') !== false)
 		return true;
 	if ( $id = url_to_postid($url) ) {
 		$post = & get_post($id);
@@ -1217,7 +1221,7 @@ function wp_insert_attachment($object, $file = false, $post_parent = 0) {
 		$object = get_object_vars($object);
 
 	// Export array as variables
-	extract($object);
+	extract($object, EXTR_SKIP);
 
 	// Get the basics.
 	$post_content    = apply_filters('content_save_pre',   $post_content);
@@ -1554,6 +1558,52 @@ function wp_check_for_changed_slugs($post_id) {
 		delete_post_meta($post_id, '_wp_old_slug', $post->post_name);
 
 	return $post_id;
+}
+
+/**
+ * This function provides a standardized way to appropriately select on
+ * the post_status of posts/pages. The function will return a piece of
+ * SQL code that can be added to a WHERE clause; this SQL is constructed
+ * to allow all published posts, and all private posts to which the user
+ * has access.
+ * 
+ * @param string $post_type currently only supports 'post' or 'page'.
+ * @return string SQL code that can be added to a where clause.
+ */
+function get_private_posts_cap_sql($post_type) {
+	global $user_ID;
+	$cap = '';
+
+	// Private posts
+	if ($post_type == 'post') {
+		$cap = 'read_private_posts';
+	// Private pages
+	} elseif ($post_type == 'page') {
+		$cap = 'read_private_pages';
+	// Dunno what it is, maybe plugins have their own post type?
+	} else {
+		$cap = apply_filters('pub_priv_sql_capability', $cap);
+
+		if (empty($cap)) {
+			// We don't know what it is, filters don't change anything,
+			// so set the SQL up to return nothing.
+			return '1 = 0';
+		}
+	}
+
+	$sql = '(post_status = \'publish\'';
+
+	if (current_user_can($cap)) {
+		// Does the user have the capability to view private posts? Guess so.
+		$sql .= ' OR post_status = \'private\'';
+	} elseif (is_user_logged_in()) {
+		// Users can view their own private posts.
+		$sql .= ' OR post_status = \'private\' AND post_author = \'' . $user_ID . '\'';
+	}
+
+	$sql .= ')';
+
+	return $sql;
 }
 
 ?>

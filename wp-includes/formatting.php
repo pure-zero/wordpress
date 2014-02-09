@@ -11,7 +11,7 @@ function wptexturize($text) {
 	// if a plugin has provided an autocorrect array, use it
 	if ( isset($wp_cockneyreplace) ) {
 		$cockney = array_keys($wp_cockneyreplace);
-		$cockney_replace = array_values($wp_cockneyreplace);
+		$cockneyreplace = array_values($wp_cockneyreplace);
 	} else {
 		$cockney = array("'tain't","'twere","'twas","'tis","'twill","'til","'bout","'nuff","'round","'cause");
 		$cockneyreplace = array("&#8217;tain&#8217;t","&#8217;twere","&#8217;twas","&#8217;tis","&#8217;twill","&#8217;til","&#8217;bout","&#8217;nuff","&#8217;round","&#8217;cause");
@@ -21,7 +21,7 @@ function wptexturize($text) {
 	$static_replacements = array_merge(array('&#8212;', ' &#8212; ', '&#8211;', 'xn--', '&#8230;', '&#8220;', '&#8217;s', '&#8221;', ' &#8482;'), $cockneyreplace);
 
 	$dynamic_characters = array('/\'(\d\d(?:&#8217;|\')?s)/', '/(\s|\A|")\'/', '/(\d+)"/', '/(\d+)\'/', '/(\S)\'([^\'\s])/', '/(\s|\A)"(?!\s)/', '/"(\s|\S|\Z)/', '/\'([\s.]|\Z)/', '/(\d+)x(\d+)/');
-	$dynamic_replacements = array('&#8217;$1','$1&#8216;', '$1&#8243;', '$1&#8242;', '$1&#8217;$2', '$1&#8220;$2', '&#8221;$1', '&#8217;$1', '$1&#215;$2');	
+	$dynamic_replacements = array('&#8217;$1','$1&#8216;', '$1&#8243;', '$1&#8242;', '$1&#8217;$2', '$1&#8220;$2', '&#8221;$1', '&#8217;$1', '$1&#215;$2');
 
 	for ( $i = 0; $i < $stop; $i++ ) {
  		$curl = $textarr[$i];
@@ -29,10 +29,9 @@ function wptexturize($text) {
 		if (isset($curl{0}) && '<' != $curl{0} && $next) { // If it's not a tag
 			// static strings
 			$curl = str_replace($static_characters, $static_replacements, $curl);
-
 			// regular expressions
 			$curl = preg_replace($dynamic_characters, $dynamic_replacements, $curl);
-		} elseif ( strstr($curl, '<code') || strstr($curl, '<pre') || strstr($curl, '<kbd') || strstr($curl, '<style') || strstr($curl, '<script') ) { 
+		} elseif (strpos($curl, '<code') !== false || strpos($curl, '<pre') !== false || strpos($curl, '<kbd') !== false || strpos($curl, '<style') !== false || strpos($curl, '<script') !== false) {
 			$next = false;
 		} else {
 			$next = true;
@@ -56,7 +55,7 @@ function wpautop($pee, $br = 1) {
 	$pee = $pee . "\n"; // just to make things a little easier, pad the end
 	$pee = preg_replace('|<br />\s*<br />|', "\n\n", $pee);
 	// Space things out a little
-	$allblocks = '(?:table|thead|tfoot|caption|colgroup|tbody|tr|td|th|div|dl|dd|dt|ul|ol|li|pre|select|form|blockquote|address|math|style|script|object|input|param|p|h[1-6])';
+	$allblocks = '(?:table|thead|tfoot|caption|colgroup|tbody|tr|td|th|div|dl|dd|dt|ul|ol|li|pre|select|form|map|area|blockquote|address|math|style|input|p|h[1-6]|hr)';
 	$pee = preg_replace('!(<' . $allblocks . '[^>]*>)!', "\n$1", $pee);
 	$pee = preg_replace('!(</' . $allblocks . '>)!', "$1\n\n", $pee);
 	$pee = str_replace(array("\r\n", "\r"), "\n", $pee); // cross-platform newlines
@@ -78,7 +77,7 @@ function wpautop($pee, $br = 1) {
 	}
 	$pee = preg_replace('!(</?' . $allblocks . '[^>]*>)\s*<br />!', "$1", $pee);
 	$pee = preg_replace('!<br />(\s*</?(?:p|li|div|dl|dd|dt|th|pre|td|ul|ol)[^>]*>)!', '$1', $pee);
-	if ( strstr( $pee, '<pre' ) )
+	if (strpos($pee, '<pre') !== false)
 		$pee = preg_replace('!(<pre.*?>)(.*?)</pre>!ise', " stripslashes('$1') .  stripslashes(clean_pre('$2'))  . '</pre>' ", $pee);
 	$pee = preg_replace( "|\n</p>$|", '</p>', $pee );
 
@@ -564,10 +563,11 @@ function backslashit($string) {
 }
 
 function trailingslashit($string) {
-		if ( '/' != substr($string, -1)) {
-				$string .= '/';
-		}
-		return $string;
+	return untrailingslashit($string) . '/';
+}
+
+function untrailingslashit($string) {
+	return rtrim($string, '/');
 }
 
 function addslashes_gpc($gpc) {
@@ -581,11 +581,18 @@ function addslashes_gpc($gpc) {
 }
 
 
-function stripslashes_deep($value)
-{
+function stripslashes_deep($value) {
 	 $value = is_array($value) ?
-							 array_map('stripslashes_deep', $value) :
-							 stripslashes($value);
+		 array_map('stripslashes_deep', $value) :
+		 stripslashes($value);
+
+	 return $value;
+}
+
+function urlencode_deep($value) {
+	 $value = is_array($value) ?
+		 array_map('urlencode_deep', $value) :
+		 urlencode($value);
 
 	 return $value;
 }
@@ -629,9 +636,15 @@ function wp_rel_nofollow( $text ) {
 	global $wpdb;
 	// This is a pre save filter, so text is already escaped.
 	$text = stripslashes($text);
-	$text = preg_replace('|<a (.+?)>|ie', "'<a ' . str_replace(' rel=\"nofollow\"','',stripslashes('$1')) . ' rel=\"nofollow\">'", $text);
+	$text = preg_replace_callback('|<a (.+?)>|i', 'wp_rel_nofollow_callback', $text);
 	$text = $wpdb->escape($text);
 	return $text;
+}
+
+function wp_rel_nofollow_callback( $matches ) {
+	$text = $matches[1];
+	$text = str_replace(array(' rel="nofollow"', " rel='nofollow'"), '', $text);
+	return "<a $text rel=\"nofollow\">";
 }
 
 function convert_smilies($text) {
@@ -658,7 +671,7 @@ function convert_smilies($text) {
 
 function is_email($user_email) {
 	$chars = "/^([a-z0-9+_]|\\-|\\.)+@(([a-z0-9_]|\\-)+\\.)+[a-z]{2,6}\$/i";
-	if(strstr($user_email, '@') && strstr($user_email, '.')) {
+	if (strpos($user_email, '@') !== false && strpos($user_email, '.') !== false) {
 		if (preg_match($chars, $user_email)) {
 			return true;
 		} else {
@@ -1074,7 +1087,7 @@ function clean_url( $url, $protocols = null ) {
 	$url = str_replace(';//', '://', $url);
 	// Append http unless a relative link starting with / or a php file.
 	if ( strpos($url, '://') === false &&
-		substr( $url, 0, 1 ) != '/' && !preg_match('/^[a-z0-9]+?\.php/i', $url) )
+		substr( $url, 0, 1 ) != '/' && !preg_match('/^[a-z0-9-]+?\.php/i', $url) )
 		$url = 'http://' . $url;
 	
 	$url = preg_replace('/&([^#])(?![a-z]{2,8};)/', '&#038;$1', $url);
@@ -1096,7 +1109,7 @@ function htmlentities2($myHTML) {
 // Escape single quotes, specialchar double quotes, and fix line endings.
 function js_escape($text) {
 	$safe_text = wp_specialchars($text, 'double');
-	$safe_text = str_replace('&#039;', "'", $safe_text);
+	$safe_text = preg_replace('/&#(x)?0*(?(1)27|39);?/i', "'", stripslashes($safe_text));
 	$safe_text = preg_replace("/\r?\n/", "\\n", addslashes($safe_text));
 	return apply_filters('js_escape', $safe_text, $text);
 }
@@ -1109,6 +1122,86 @@ function attribute_escape($text) {
 
 function wp_make_link_relative( $link ) {
 	return preg_replace('|https?://[^/]+(/.*)|i', '$1', $link );
+}
+
+function sanitize_option($option, $value) { // Remember to call stripslashes!
+
+	switch ($option) {
+		case 'admin_email':
+			$value = sanitize_email($value);
+			break;
+
+		case 'default_post_edit_rows':
+		case 'mailserver_port':
+		case 'comment_max_links':
+		case 'page_on_front':
+		case 'rss_excerpt_length':
+		case 'default_category':
+		case 'default_email_category':
+		case 'default_link_category':
+			$value = abs((int) $value);
+			break;
+
+		case 'posts_per_page':
+		case 'posts_per_rss':
+			$value = (int) $value;
+			if ( empty($value) ) $value = 1;
+			if ( $value < -1 ) $value = abs($value);
+			break;
+
+		case 'default_ping_status':
+		case 'default_comment_status':
+			// Options that if not there have 0 value but need to be something like "closed"
+			if ( $value == '0' || $value == '')
+				$value = 'closed';
+			break;
+
+		case 'blogdescription':
+		case 'blogname':
+			$value = addslashes($value);
+			$value = wp_filter_post_kses( $value ); // calls stripslashes then addslashes
+			$value = stripslashes($value);
+			$value = wp_specialchars( $value );
+			break;
+
+		case 'blog_charset':
+			$value = preg_replace('/[^a-zA-Z0-9_-]/', '', $value); // strips slashes
+			break;
+
+		case 'date_format':
+		case 'time_format':
+		case 'mailserver_url':
+		case 'mailserver_login':
+		case 'mailserver_pass':
+		case 'ping_sites':
+		case 'upload_path':
+			$value = strip_tags($value);
+			$value = addslashes($value);
+			$value = wp_filter_kses($value); // calls stripslashes then addslashes
+			$value = stripslashes($value);
+			break;
+
+		case 'gmt_offset':
+			$value = preg_replace('/[^0-9:.-]/', '', $value); // strips slashes
+			break;
+
+		case 'siteurl':
+		case 'home':
+			$value = stripslashes($value);
+			$value = clean_url($value);
+			break;
+		default :
+			break;
+	}
+
+	return $value;
+}
+
+function wp_parse_str( $string, &$array ) {
+	parse_str( $string, $array );
+	if ( get_magic_quotes_gpc() )
+		$array = stripslashes_deep( $array ); // parse_str() adds slashes if magicquotes is on.  See: http://php.net/parse_str
+	$array = apply_filters( 'wp_parse_str', $array );
 }
 
 ?>
