@@ -17,11 +17,10 @@ $import_root = ABSPATH.$import_loc;
 $imports_dir = @ dir($import_root);
 if ($imports_dir) {
 	while (($file = $imports_dir->read()) !== false) {
-		if ($file{0} == '.') {
+		if (preg_match('|^\.+$|', $file))
 			continue;
-		} elseif (substr($file, -4) == '.php') {
-			require_once($import_root . '/' . $file);
-		}
+		if (preg_match('|\.php$|', $file))
+			require_once("$import_root/$file");
 	}
 }
 

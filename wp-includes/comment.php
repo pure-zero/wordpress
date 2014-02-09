@@ -178,7 +178,7 @@ function sanitize_comment_cookies() {
 
 function wp_allow_comment($commentdata) {
 	global $wpdb;
-	extract($commentdata, EXTR_SKIP);
+	extract($commentdata);
 
 	// Simple duplicate check
 	$dupe = "SELECT comment_ID FROM $wpdb->comments WHERE comment_post_ID = '$comment_post_ID' AND ( comment_author = '$comment_author' ";
@@ -325,7 +325,7 @@ function wp_get_current_commenter() {
 
 function wp_insert_comment($commentdata) {
 	global $wpdb;
-	extract($commentdata, EXTR_SKIP);
+	extract($commentdata);
 
 	if ( ! isset($comment_author_IP) )
 		$comment_author_IP = preg_replace( '/[^0-9., ]/', '',$_SERVER['REMOTE_ADDR'] );
@@ -457,7 +457,7 @@ function wp_update_comment($commentarr) {
 	$commentarr = wp_filter_comment( $commentarr );
 
 	// Now extract the merged array.
-	extract($commentarr, EXTR_SKIP);
+	extract($commentarr);
 
 	$comment_content = apply_filters('comment_save_pre', $comment_content);
 
@@ -517,7 +517,7 @@ function discover_pingback_server_uri($url, $timeout_bytes = 2048) {
 	$x_pingback_str = 'x-pingback: ';
 	$pingback_href_original_pos = 27;
 
-	extract(parse_url($url), EXTR_SKIP);
+	extract(parse_url($url));
 
 	if ( !isset($host) ) // Not an URL. This should never happen.
 		return false;

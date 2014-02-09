@@ -136,10 +136,6 @@ function get_links($category = -1,
 
 		if ( $show_description && '' != $desc )
 			$output .= $between . $desc;
-		
-		if ($show_rating) {
-			$output .= $between . get_linkrating($row);
-		}
 
 		$output .= "$after\n";
 	} // end while
@@ -253,7 +249,7 @@ function _walk_bookmarks($bookmarks, $args = '' ) {
 	$defaults = array('show_updated' => 0, 'show_description' => 0, 'show_images' => 1, 'before' => '<li>',
 		'after' => '</li>', 'between' => "\n");
 	$r = array_merge($defaults, $r);
-	extract($r, EXTR_SKIP);
+	extract($r);
 
 	foreach ( (array) $bookmarks as $bookmark ) {
 		if ( !isset($bookmark->recently_updated) )
@@ -270,9 +266,9 @@ function _walk_bookmarks($bookmarks, $args = '' ) {
 		if ( '' != $rel )
 			$rel = ' rel="' . $rel . '"';
 
-		$desc = attribute_escape(apply_filters('link_description', $bookmark->link_description)); 
- 		$name = attribute_escape(apply_filters('link_title', $bookmark->link_name)); 
- 		$title = $desc;
+		$desc = attribute_escape($bookmark->link_description);
+		$name = attribute_escape($bookmark->link_name);
+		$title = $desc;
 
 		if ( $show_updated )
 			if ( '00' != substr($bookmark->link_updated_f, 0, 2) ) {
@@ -308,11 +304,6 @@ function _walk_bookmarks($bookmarks, $args = '' ) {
 
 		if ( $show_description && '' != $desc )
 			$output .= $between . $desc;
-		
-		if ($show_rating) {
-			$output .= $between . get_linkrating($bookmark);
-		}
-		
 		$output .= "$after\n";
 	} // end while
 
@@ -331,7 +322,7 @@ function wp_list_bookmarks($args = '') {
 		'category_orderby' => 'name', 'category_order' => 'ASC', 'class' => 'linkcat',
 		'category_before' => '<li id="%id" class="%class">', 'category_after' => '</li>');
 	$r = array_merge($defaults, $r);
-	extract($r, EXTR_SKIP);
+	extract($r);
 
 	$output = '';
 
@@ -340,20 +331,18 @@ function wp_list_bookmarks($args = '') {
 		$cats = get_categories("type=link&category_name=$category_name&include=$category&orderby=$category_orderby&order=$category_order&hierarchical=0");
 
 		foreach ( (array) $cats as $cat ) {
-			$params = array_merge($r, array('category'=>$cat->cat_ID));
-			$bookmarks = get_bookmarks($params);
+			$bookmarks = get_bookmarks("limit=$limit&category={$cat->cat_ID}&show_updated=$show_updated&orderby=$orderby&order=$order&hide_invisible=$hide_invisible&show_updated=$show_updated");
 			if ( empty($bookmarks) )
 				continue;
 			$output .= str_replace(array('%id', '%class'), array("linkcat-$cat->cat_ID", $class), $category_before);
-			$catname = apply_filters( "link_category", $cat->cat_name );
-			$output .= "$title_before$catname$title_after\n\t<ul>\n";
+			$output .= "$title_before$cat->cat_name$title_after\n\t<ul>\n";
 			$output .= _walk_bookmarks($bookmarks, $r);
 			$output .= "\n\t</ul>\n$category_after\n";
 		}
 	} else {
 		//output one single list using title_li for the title
-		$bookmarks = get_bookmarks($r);
-
+		$bookmarks = get_bookmarks("limit=$limit&category=$category&show_updated=$show_updated&orderby=$orderby&order=$order&hide_invisible=$hide_invisible&show_updated=$show_updated");
+		
 		if ( !empty($bookmarks) ) {
 			if ( !empty( $title_li ) ){
 				$output .= str_replace(array('%id', '%class'), array("linkcat-$category", $class), $category_before);

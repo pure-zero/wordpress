@@ -156,7 +156,6 @@ class RSS_Import {
 				$this->greet();
 				break;
 			case 1 :
-				check_admin_referer('import-upload');
 				$this->import();
 				break;
 		}

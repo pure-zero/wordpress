@@ -17,7 +17,8 @@ function get_locale() {
 	return $locale;
 }
 
-function translate($text, $domain) {
+// Return a translated string.
+function __($text, $domain = 'default') {
 	global $l10n;
 
 	if (isset($l10n[$domain]))
@@ -26,24 +27,14 @@ function translate($text, $domain) {
 		return $text;
 }
 
-// Return a translated string.
-function __($text, $domain = 'default') {
-	return translate($text, $domain);
-}
-
 // Echo a translated string.
 function _e($text, $domain = 'default') {
-	echo translate($text, $domain);
-}
+	global $l10n;
 
-function _c($text, $domain = 'default') {
-	$whole = translate($text, $domain);
-	$last_bar = strrpos($whole, '|');
-	if ( false == $last_bar ) {
-		return $whole;
-	} else {
-		return substr($whole, 0, $last_bar);
-	}
+	if (isset($l10n[$domain]))
+		echo apply_filters('gettext', $l10n[$domain]->translate($text), $text);
+	else
+		echo $text;
 }
 
 // Return the plural form.
@@ -51,7 +42,7 @@ function __ngettext($single, $plural, $number, $domain = 'default') {
 	global $l10n;
 
 	if (isset($l10n[$domain])) {
-		return apply_filters('ngettext', $l10n[$domain]->ngettext($single, $plural, $number), $single, $plural, $number);
+		return $l10n[$domain]->ngettext($single, $plural, $number);
 	} else {
 		if ($number != 1)
 			return $plural;

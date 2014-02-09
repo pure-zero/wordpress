@@ -22,7 +22,6 @@ function wp_write_post() {
 
 
 	// Check for autosave collisions
-	$temp_id = false;
 	if ( isset($_POST['temp_ID']) ) {
 		$temp_id = (int) $_POST['temp_ID'];
 		if ( !$draft_ids = get_user_option( 'autosave_draft_ids' ) )
@@ -34,6 +33,7 @@ function wp_write_post() {
 		if ( isset($draft_ids[$temp_id]) ) { // Edit, don't write
 			$_POST['post_ID'] = $draft_ids[$temp_id];
 			unset($_POST['temp_ID']);
+			relocate_children( $temp_id, $_POST['post_ID'] );
 			update_user_option( $user_ID, 'autosave_draft_ids', $draft_ids );
 			return edit_post();
 		}
@@ -105,8 +105,6 @@ function wp_write_post() {
 		$_POST['post_date'] = sprintf( "%04d-%02d-%02d %02d:%02d:%02d", $aa, $mm, $jj, $hh, $mn, $ss );
 		$_POST['post_date_gmt'] = get_gmt_from_date( $_POST['post_date'] );
 	}
-	
-	unset($_POST['no_filter']);
 
 	// Create the post.
 	$post_ID = wp_insert_post( $_POST );
@@ -114,15 +112,9 @@ function wp_write_post() {
 	add_meta( $post_ID );
 
 	// Reunite any orphaned attachments with their parent
-	if ( !$draft_ids = get_user_option( 'autosave_draft_ids' ) )
-		$draft_ids = array();
-	if ( $draft_temp_id = (int) array_search( $post_ID, $draft_ids ) )
-		relocate_children( $draft_temp_id, $post_ID );
-	if ( $temp_id && $temp_id != $draft_temp_id )
-		relocate_children( $temp_id, $post_ID );
-
 	// Update autosave collision detection
 	if ( $temp_id ) {
+		relocate_children( $temp_id, $post_ID );
 		$draft_ids[$temp_id] = $post_ID;
 		update_user_option( $user_ID, 'autosave_draft_ids', $draft_ids );
 	}
@@ -285,17 +277,9 @@ function edit_post() {
 			delete_meta( $key );
 	}
 
-	unset($_POST['no_filter']);
-	
 	add_meta( $post_ID );
 
-	wp_update_post( $_POST );
-
-	// Reunite any orphaned attachments with their parent
-	if ( !$draft_ids = get_user_option( 'autosave_draft_ids' ) )
-		$draft_ids = array();
-	if ( $draft_temp_id = (int) array_search( $post_ID, $draft_ids ) )
-		relocate_children( $draft_temp_id, $post_ID );
+	wp_update_post( $_POST);
 
 	// Now that we have an ID we can fix any attachment anchor hrefs
 	fix_attachment_links( $post_ID );
@@ -351,8 +335,6 @@ function get_post_to_edit( $id ) {
 	$post->post_title = apply_filters( 'title_edit_pre', $post->post_title );
 
 	$post->post_password = format_to_edit( $post->post_password );
-	
-	$post->menu_order = (int) $post->menu_order;
 
 	if ( $post->post_type == 'page' )
 		$post->page_template = get_post_meta( $id, '_wp_page_template', true );
@@ -402,16 +384,12 @@ function get_default_post_to_edit() {
 
 function get_comment_to_edit( $id ) {
 	$comment = get_comment( $id );
-	
-	$comment->comment_ID = (int) $comment->comment_ID;
-	$comment->comment_post_ID = (int) $comment->comment_post_ID;
 
-	$comment->comment_content = format_to_edit( $comment->comment_content );
+	$comment->comment_content = format_to_edit( $comment->comment_content, user_can_richedit() );
 	$comment->comment_content = apply_filters( 'comment_edit_pre', $comment->comment_content);
 
 	$comment->comment_author = format_to_edit( $comment->comment_author );
 	$comment->comment_author_email = format_to_edit( $comment->comment_author_email );
-	$comment->comment_author_url = clean_url($comment->comment_author_url);
 	$comment->comment_author_url = format_to_edit( $comment->comment_author_url );
 
 	return $comment;
@@ -419,9 +397,6 @@ function get_comment_to_edit( $id ) {
 
 function get_category_to_edit( $id ) {
 	$category = get_category( $id );
-	
-	$category->term_id = (int) $category->term_id;
-	$category->parent = (int) $category->parent;
 
 	return $category;
 }
@@ -694,7 +669,7 @@ function get_nested_categories( $default = 0, $parent = 0 ) {
 		if ( count( $checked_categories ) == 0 ) {
 			// No selected categories, strange
 			$checked_categories[] = $default;
-		}
+		}	
 	} else {
 		$checked_categories[] = $default;
 	}
@@ -718,7 +693,7 @@ function get_nested_categories( $default = 0, $parent = 0 ) {
 
 function write_nested_categories( $categories ) {
 	foreach ( $categories as $category ) {
-		echo '<li id="category-', $category['cat_ID'], '"><label for="in-category-', $category['cat_ID'], '" class="selectit"><input value="', $category['cat_ID'], '" type="checkbox" name="post_category[]" id="in-category-', $category['cat_ID'], '"', ($category['checked'] ? ' checked="checked"' : "" ), '/> ', wp_specialchars( apply_filters('the_category', $category['cat_name'] )), "</label></li>";
+		echo '<li id="category-', $category['cat_ID'], '"><label for="in-category-', $category['cat_ID'], '" class="selectit"><input value="', $category['cat_ID'], '" type="checkbox" name="post_category[]" id="in-category-', $category['cat_ID'], '"', ($category['checked'] ? ' checked="checked"' : "" ), '/> ', wp_specialchars( $category['cat_name'] ), "</label></li>";
 
 		if ( $category['children'] ) {
 			echo "<ul>\n";
@@ -750,7 +725,7 @@ function get_nested_link_categories( $default = 0, $parent = 0 ) {
 		if ( count( $checked_categories ) == 0 ) {
 			// No selected categories, strange
 			$checked_categories[] = $default;
-		}
+		}	
 	} else {
 		$checked_categories[] = $default;
 	}
@@ -781,20 +756,17 @@ function cat_rows( $parent = 0, $level = 0, $categories = 0 ) {
 	if (!$categories )
 		$categories = get_categories( 'hide_empty=0' );
 
-	$children = _get_category_hierarchy();
-
 	if ( $categories ) {
 		ob_start();
 		foreach ( $categories as $category ) {
 			if ( $category->category_parent == $parent) {
 				echo "\t" . _cat_row( $category, $level );
-				if ( isset($children[$category->cat_ID]) )
-					cat_rows( $category->cat_ID, $level +1, $categories );
+				cat_rows( $category->cat_ID, $level +1, $categories );
 			}
 		}
 		$output = ob_get_contents();
 		ob_end_clean();
-
+		
 		$output = apply_filters('cat_rows', $output);
 
 		echo $output;
@@ -813,7 +785,7 @@ function _cat_row( $category, $level, $name_override = false ) {
 		$default_link_cat_id = (int) get_option( 'default_link_category' );
 
 		if ( ($category->cat_ID != $default_cat_id ) && ($category->cat_ID != $default_link_cat_id ) )
-			$edit .= "<td><a href='" . wp_nonce_url( "categories.php?action=delete&amp;cat_ID=$category->cat_ID", 'delete-category_' . $category->cat_ID ) . "' onclick=\"return deleteSomething( 'cat', $category->cat_ID, '" . js_escape(sprintf( __("You are about to delete the category '%s'.\nAll posts that were only assigned to this category will be assigned to the '%s' category.\nAll links that were only assigned to this category will be assigned to the '%s' category.\n'OK' to delete, 'Cancel' to stop." ), $category->cat_name, get_catname( $default_cat_id ), get_catname( $default_link_cat_id ) )) . "' );\" class='delete'>".__( 'Delete' )."</a>";
+			$edit .= "<td><a href='" . wp_nonce_url( "categories.php?action=delete&amp;cat_ID=$category->cat_ID", 'delete-category_' . $category->cat_ID ) . "' onclick=\"return deleteSomething( 'cat', $category->cat_ID, '" . js_escape(sprintf( __("You are about to delete the category '%s'.\nAll of its posts will go into the default category of '%s'\nAll of its bookmarks will go into the default category of '%s'.\n'OK' to delete, 'Cancel' to stop." ), $category->cat_name, get_catname( $default_cat_id ), get_catname( $default_link_cat_id ) )) . "' );\" class='delete'>".__( 'Delete' )."</a>";
 		else
 			$edit .= "<td style='text-align:center'>".__( "Default" );
 	} else
@@ -902,68 +874,6 @@ function user_row( $user_object, $style = '' ) {
 	return $r;
 }
 
-function _wp_get_comment_list( $s = false, $start, $num ) {
-	global $wpdb;
-
-	$start = abs( (int) $start );
-	$num = (int) $num;
-
-	if ( $s ) {
-		$s = $wpdb->escape($s);
-		$comments = $wpdb->get_results("SELECT SQL_CALC_FOUND_ROWS * FROM $wpdb->comments WHERE
-			(comment_author LIKE '%$s%' OR
-			comment_author_email LIKE '%$s%' OR
-			comment_author_url LIKE ('%$s%') OR
-			comment_author_IP LIKE ('%$s%') OR
-			comment_content LIKE ('%$s%') ) AND
-			comment_approved != 'spam'
-			ORDER BY comment_date DESC LIMIT $start, $num");
-	} else {
-		$comments = $wpdb->get_results( "SELECT SQL_CALC_FOUND_ROWS * FROM $wpdb->comments WHERE comment_approved = '0' OR comment_approved = '1' ORDER BY comment_date DESC LIMIT $start, $num" );
-	}
-
-	$total = $wpdb->get_var( "SELECT FOUND_ROWS()" );
-
-	return array($comments, $total);
-}
-
-function _wp_comment_list_item( $id, $alt = 0 ) {
-	global $authordata, $comment, $wpdb;
-	$id = (int) $id;
-	$comment =& get_comment( $id );
-	$class = '';
-	$authordata = get_userdata($wpdb->get_var("SELECT post_author FROM $wpdb->posts WHERE ID = $comment->comment_post_ID"));
-	$comment_status = wp_get_comment_status($comment->comment_ID);
-	if ( 'unapproved' == $comment_status )
-		$class .= ' unapproved';
-	if ( $alt % 2 )
-		$class .= ' alternate';
-	echo "<li id='comment-$comment->comment_ID' class='$class'>";
-?>
-<p><strong><?php comment_author(); ?></strong> <?php if ($comment->comment_author_email) { ?>| <?php comment_author_email_link() ?> <?php } if ($comment->comment_author_url && 'http://' != $comment->comment_author_url) { ?> | <?php comment_author_url_link() ?> <?php } ?>| <?php _e('IP:') ?> <a href="http://ws.arin.net/cgi-bin/whois.pl?queryinput=<?php comment_author_IP() ?>"><?php comment_author_IP() ?></a></p>
-
-<?php comment_text() ?>
-
-<p><?php comment_date(__('M j, g:i A'));  ?> &#8212; [
-<?php
-if ( current_user_can('edit_post', $comment->comment_post_ID) ) {
-	echo " <a href='comment.php?action=editcomment&amp;c=".$comment->comment_ID."'>" .  __('Edit') . '</a>';
-	echo ' | <a href="' . wp_nonce_url('comment.php?action=deletecomment&amp;p=' . $comment->comment_post_ID . '&amp;c=' . $comment->comment_ID, 'delete-comment_' . $comment->comment_ID) . '" onclick="return deleteSomething( \'comment\', ' . $comment->comment_ID . ', \'' . js_escape(sprintf(__("You are about to delete this comment by '%s'.\n'Cancel' to stop, 'OK' to delete."), $comment->comment_author)) . "', theCommentList );\">" . __('Delete') . '</a> ';
-	if ( ('none' != $comment_status) && ( current_user_can('moderate_comments') ) ) {
-		echo '<span class="unapprove"> | <a href="' . wp_nonce_url('comment.php?action=unapprovecomment&amp;p=' . $comment->comment_post_ID . '&amp;c=' . $comment->comment_ID, 'unapprove-comment_' . $comment->comment_ID) . '" onclick="return dimSomething( \'comment\', ' . $comment->comment_ID . ', \'unapproved\', theCommentList );">' . __('Unapprove') . '</a> </span>';
-		echo '<span class="approve"> | <a href="' . wp_nonce_url('comment.php?action=approvecomment&amp;p=' . $comment->comment_post_ID . '&amp;c=' . $comment->comment_ID, 'approve-comment_' . $comment->comment_ID) . '" onclick="return dimSomething( \'comment\', ' . $comment->comment_ID . ', \'unapproved\', theCommentList );">' . __('Approve') . '</a> </span>';
-	}
-	echo " | <a href=\"" . wp_nonce_url("comment.php?action=deletecomment&amp;dt=spam&amp;p=" . $comment->comment_post_ID . "&amp;c=" . $comment->comment_ID, 'delete-comment_' . $comment->comment_ID) . "\" onclick=\"return deleteSomething( 'comment-as-spam', $comment->comment_ID, '" . js_escape(sprintf(__("You are about to mark as spam this comment by '%s'.\n'Cancel' to stop, 'OK' to mark as spam."), $comment->comment_author))  . "', theCommentList );\">" . __('Spam') . "</a> ";
-}
-$post = get_post($comment->comment_post_ID);
-$post_title = wp_specialchars( $post->post_title, 'double' );
-$post_title = ('' == $post_title) ? "# $comment->comment_post_ID" : $post_title;
-?>
- ] &#8212; <a href="<?php echo get_permalink($comment->comment_post_ID); ?>"><?php echo $post_title; ?></a></p>
-		</li>
-<?php
-}
-
 function wp_dropdown_cats( $currentcat = 0, $currentparent = 0, $parent = 0, $level = 0, $categories = 0 ) {
 	global $wpdb;
 	if (!$categories )
@@ -1039,7 +949,6 @@ function list_meta( $meta ) {
 		$key_js = js_escape( $entry['meta_key'] );
 		$entry['meta_key']   = attribute_escape($entry['meta_key']);
 		$entry['meta_value'] = attribute_escape($entry['meta_value']);
-		$entry['meta_id'] = (int) $entry['meta_id'];
 		$r .= "\n\t<tr id='meta-{$entry['meta_id']}' class='$style'>";
 		$r .= "\n\t\t<td valign='top'><input name='meta[{$entry['meta_id']}][key]' tabindex='6' type='text' size='20' value='{$entry['meta_key']}' /></td>";
 		$r .= "\n\t\t<td><textarea name='meta[{$entry['meta_id']}][value]' tabindex='6' rows='2' cols='30'>{$entry['meta_value']}</textarea></td>";
@@ -1092,7 +1001,7 @@ function meta_form() {
 <?php
 
 	foreach ( $keys as $key ) {
-		$key = attribute_escape( $key );
+		$key = attribute_escape( $key);
 		echo "\n\t<option value='$key'>$key</option>";
 	}
 ?>
@@ -1113,8 +1022,6 @@ function add_meta( $post_ID ) {
 	global $wpdb;
 	$post_ID = (int) $post_ID;
 
-	$protected = array( '_wp_attached_file', '_wp_attachment_metadata', '_wp_old_slug', '_wp_page_template' );
-
 	$metakeyselect = $wpdb->escape( stripslashes( trim( $_POST['metakeyselect'] ) ) );
 	$metakeyinput = $wpdb->escape( stripslashes( trim( $_POST['metakeyinput'] ) ) );
 	$metavalue = maybe_serialize( stripslashes( (trim( $_POST['metavalue'] ) ) ));
@@ -1129,9 +1036,6 @@ function add_meta( $post_ID ) {
 
 		if ( $metakeyinput)
 			$metakey = $metakeyinput; // default
-
-		if ( in_array($metakey, $protected) )
-			return false;
 
 		$result = $wpdb->query( "
 						INSERT INTO $wpdb->postmeta 
@@ -1152,12 +1056,6 @@ function delete_meta( $mid ) {
 
 function update_meta( $mid, $mkey, $mvalue ) {
 	global $wpdb;
-
-	$protected = array( '_wp_attached_file', '_wp_attachment_metadata', '_wp_old_slug', '_wp_page_template' );
-
-	if ( in_array($mkey, $protected) )
-		return false;
-
 	$mvalue = maybe_serialize( stripslashes( $mvalue ));
 	$mvalue = $wpdb->escape( $mvalue );
 	$mid = (int) $mid;
@@ -1233,7 +1131,7 @@ function insert_with_markers( $filename, $marker, $insertion ) {
 		if ( $markerdata ) {
 			$state = true;
 			foreach ( $markerdata as $n => $markerline ) {
-				if (strpos($markerline, '# BEGIN ' . $marker) !== false)
+				if ( strstr( $markerline, "# BEGIN {$marker}" ))
 					$state = false;
 				if ( $state ) {
 					if ( $n + 1 < count( $markerdata ) )
@@ -1241,7 +1139,7 @@ function insert_with_markers( $filename, $marker, $insertion ) {
 					else
 						fwrite( $f, "{$markerline}" );
 				}
-				if (strpos($markerline, '# END ' . $marker) !== false) {
+				if ( strstr( $markerline, "# END {$marker}" ) ) {
 					fwrite( $f, "# BEGIN {$marker}\n" );
 					if ( is_array( $insertion ))
 						foreach ( $insertion as $insertline )
@@ -1279,11 +1177,11 @@ function extract_from_markers( $filename, $marker ) {
 	{
 		$state = false;
 		foreach ( $markerdata as $markerline ) {
-			if (strpos($markerline, '# END ' . $marker) !== false)
+			if ( strstr( $markerline, "# END {$marker}" ))
 				$state = false;
 			if ( $state )
 				$result[] = $markerline;
-			if (strpos($markerline, '# BEGIN ' . $marker) !== false)
+			if ( strstr( $markerline, "# BEGIN {$marker}" ))
 				$state = true;
 		}
 	}
@@ -1406,7 +1304,7 @@ function user_can_access_admin_page() {
 
 	if ( isset( $plugin_page ) && isset( $_wp_submenu_nopriv[$parent][$plugin_page] ) )
 		return false;
-
+	
 	if ( empty( $parent) ) {
 		if ( isset( $_wp_menu_nopriv[$pagenow] ) )
 			return false;
@@ -1418,7 +1316,7 @@ function user_can_access_admin_page() {
 			if ( isset( $_wp_submenu_nopriv[$key][$pagenow] ) )
 				return false;
 			if ( isset( $plugin_page ) && isset( $_wp_submenu_nopriv[$key][$plugin_page] ) )
-			return false;
+			return false;	
 		}
 		return true;
 	}
@@ -1540,14 +1438,14 @@ function get_admin_page_parent() {
 			if ( isset( $_wp_real_parent_file[$parent_file] ) )
 					$parent_file = $_wp_real_parent_file[$parent_file];
 			return $parent_file;
-		}
+		}			
 	}
 
 	if ( isset( $plugin_page ) && isset( $_wp_submenu_nopriv[$pagenow][$plugin_page] ) ) {
 		$parent_file = $pagenow;
 		if ( isset( $_wp_real_parent_file[$parent_file] ) )
 			$parent_file = $_wp_real_parent_file[$parent_file];
-		return $parent_file;
+		return $parent_file;		
 	}
 
 	foreach (array_keys( $submenu ) as $parent) {
@@ -1761,7 +1659,7 @@ function get_plugin_data( $plugin_file ) {
 		$author = '<a href="' . trim( $author_uri[1] ) . '" title="'.__( 'Visit author homepage' ).'">' . trim( $author_name[1] ) . '</a>';
 	}
 
-	return array('Name' => $name, 'Title' => $plugin, 'Description' => $description, 'Author' => $author, 'Version' => $version);
+	return array ('Name' => $name, 'Title' => $plugin, 'Description' => $description, 'Author' => $author, 'Version' => $version, 'Template' => $template[1] );
 }
 
 function get_plugins() {
@@ -1778,20 +1676,20 @@ function get_plugins() {
 	$plugins_dir = @ dir( $plugin_root);
 	if ( $plugins_dir ) {
 		while (($file = $plugins_dir->read() ) !== false ) {
-			if ( substr($file, 0, 1) == '.' )
+			if ( preg_match( '|^\.+$|', $file ))
 				continue;
 			if ( is_dir( $plugin_root.'/'.$file ) ) {
 				$plugins_subdir = @ dir( $plugin_root.'/'.$file );
 				if ( $plugins_subdir ) {
 					while (($subfile = $plugins_subdir->read() ) !== false ) {
-						if ( substr($subfile, 0, 1) == '.' )
+						if ( preg_match( '|^\.+$|', $subfile ))
 							continue;
-						if ( substr($subfile, -4) == '.php' )
+						if ( preg_match( '|\.php$|', $subfile ))
 							$plugin_files[] = "$file/$subfile";
 					}
 				}
 			} else {
-				if ( substr($file, -4) == '.php' )
+				if ( preg_match( '|\.php$|', $file ))
 					$plugin_files[] = $file;
 			}
 		}
@@ -1856,8 +1754,7 @@ function browse_happy() {
 		<p id="bh" style="text-align: center;"><a href="http://browsehappy.com/" title="'.$getit.'"><img src="images/browse-happy.gif" alt="Browse Happy" /></a></p>
 		';
 }
-
-if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE') !== false)
+if ( strstr( $_SERVER['HTTP_USER_AGENT'], 'MSIE' ))
 	add_action( 'admin_footer', 'browse_happy' );
 
 function documentation_link( $for ) {
@@ -1872,7 +1769,7 @@ function register_importer( $id, $name, $description, $callback ) {
 
 function get_importers() {
 	global $wp_importers;
-	uasort($wp_importers, create_function('$a, $b', 'return strcmp($a[0], $b[0]);'));
+
 	return $wp_importers;
 }
 
@@ -1996,7 +1893,7 @@ function wp_handle_upload( &$file, $overrides = false ) {
 
 	// Compute the URL
 	$url = $uploads['url'] . "/$filename";
-
+	
 	$return = apply_filters( 'wp_handle_upload', array( 'file' => $new_file, 'url' => $url, 'type' => $type ) );
 
 	return $return;
@@ -2018,16 +1915,15 @@ function wp_import_cleanup( $id ) {
 function wp_import_upload_form( $action ) {
 	$size = strtolower( ini_get( 'upload_max_filesize' ) );
 	$bytes = 0;
-	if (strpos($size, 'k') !== false)
+	if ( strstr( $size, 'k' ) )
 		$bytes = $size * 1024;
-	if (strpos($size, 'm') !== false)
+	if ( strstr( $size, 'm' ) )
 		$bytes = $size * 1024 * 1024;
-	if (strpos($size, 'g') !== false)
+	if ( strstr( $size, 'g' ) )
 		$bytes = $size * 1024 * 1024 * 1024;
 ?>
 <form enctype="multipart/form-data" id="import-upload-form" method="post" action="<?php echo attribute_escape($action) ?>">
 <p>
-<?php wp_nonce_field('import-upload'); ?>
 <label for="upload"><?php _e( 'Choose a file from your computer:' ); ?></label> (<?php printf( __('Maximum size: %s' ), $size ); ?> )
 <input type="file" id="upload" name="import" size="25" />
 <input type="hidden" name="action" value="save" />
@@ -2156,7 +2052,7 @@ function update_home_siteurl( $old_value, $value ) {
 	// Clear cookies for old paths.
 	wp_clearcookie();
 	// Set cookies for new paths.
-	wp_setcookie( $user_login, $user_pass_md5, true, get_option( 'home' ), get_option( 'siteurl' ));
+	wp_setcookie( $user_login, $user_pass_md5, true, get_option( 'home' ), get_option( 'siteurl' ));	
 }
 
 add_action( 'update_option_home', 'update_home_siteurl', 10, 2 );
@@ -2178,9 +2074,7 @@ function wp_crop_image( $src_file, $src_x, $src_y, $src_w, $src_h, $dst_w, $dst_
 		$src_h -= $src_y;
 	}
 
-	if (function_exists('imageantialias'))
-		imageantialias( $dst, true );
-	
+	imageantialias( $dst, true );
 	imagecopyresampled( $dst, $src, 0, 0, $src_x, $src_y, $dst_w, $dst_h, $src_w, $src_h );
 
 	if ( !$dst_file )
@@ -2300,7 +2194,7 @@ function wp_create_thumbnail( $file, $max_side, $effect = '' ) {
 
 			// If no filters change the filename, we'll do a default transformation.
 			if ( basename( $file ) == $thumb = apply_filters( 'thumbnail_filename', basename( $file ) ) )
-				$thumb = preg_replace( '!(\.[^.]+)?$!', '.thumbnail' . '$1', basename( $file ), 1 );
+				$thumb = preg_replace( '!(\.[^.]+)?$!', __( '.thumbnail' ).'$1', basename( $file ), 1 );
 
 			$thumbpath = str_replace( basename( $file ), $thumb, $file );
 
