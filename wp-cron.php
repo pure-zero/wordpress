@@ -1,60 +1,35 @@
 <?php
-/**
- * WordPress Cron Implementation for hosts, which do not offer CRON or for which
- * the user has not set up a CRON job pointing to this file.
- *
- * The HTTP request to this file will not slow down the visitor who happens to
- * visit when the cron job is needed to run.
- *
- * @package WordPress
- */
-
 ignore_user_abort(true);
+define('DOING_CRON', TRUE);
+require_once('./wp-config.php');
 
-if ( !empty($_POST) || defined('DOING_AJAX') || defined('DOING_CRON') )
-	die();
+if ( $_GET['check'] != wp_hash('187425') )
+	exit;
 
-/**
- * Tell WordPress we are doing the CRON task.
- *
- * @var bool
- */
-define('DOING_CRON', true);
+if ( get_option('doing_cron') > time() )
+	exit;
 
-if ( !defined('ABSPATH') ) {
-	/** Set up WordPress environment */
-	require_once('./wp-load.php');
-}
+update_option('doing_cron', time() + 30);
 
-if ( false === $crons = _get_cron_array() )
-	die();
-
-$keys = array_keys( $crons );
-$local_time = time();
-
-if ( isset($keys[0]) && $keys[0] > $local_time )
-	die();
-
+$crons = _get_cron_array();
+$keys = array_keys($crons);
+if (!is_array($crons) || $keys[0] > time())
+	return;
 foreach ($crons as $timestamp => $cronhooks) {
-	if ( $timestamp > $local_time )
-		break;
-
+	if ($timestamp > time()) break;
 	foreach ($cronhooks as $hook => $keys) {
-
-		foreach ($keys as $k => $v) {
-
-			$schedule = $v['schedule'];
-
+		foreach ($keys as $key => $args) {
+			$schedule = $args['schedule'];
 			if ($schedule != false) {
-				$new_args = array($timestamp, $schedule, $hook, $v['args']);
+				$new_args = array($timestamp, $schedule, $hook, $args['args']);
 				call_user_func_array('wp_reschedule_event', $new_args);
 			}
-
-			wp_unschedule_event($timestamp, $hook, $v['args']);
-
- 			do_action_ref_array($hook, $v['args']);
+			wp_unschedule_event($timestamp, $hook, $args['args']);
+ 			do_action_ref_array($hook, $args['args']);
 		}
 	}
 }
 
-die();
+update_option('doing_cron', 0);
+
+?>

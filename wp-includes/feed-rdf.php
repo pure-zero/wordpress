@@ -1,14 +1,10 @@
 <?php
-/**
- * RSS 1 RDF Feed Template for displaying RSS 1 Posts feed.
- *
- * @package WordPress
- */
-
-header('Content-Type: ' . feed_content_type('rdf') . '; charset=' . get_option('blog_charset'), true);
+header('Content-Type: application/rdf+xml; charset=' . get_option('blog_charset'), true);
 $more = 1;
 
-echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>'; ?>
+?>
+<?php echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>'; ?>
+<!-- generator="wordpress/<?php echo $wp_version ?>" -->
 <rdf:RDF
 	xmlns="http://purl.org/rss/1.0/"
 	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -23,8 +19,9 @@ echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>'; ?>
 	<link><?php bloginfo_rss('url') ?></link>
 	<description><?php bloginfo_rss('description') ?></description>
 	<dc:date><?php echo mysql2date('Y-m-d\TH:i:s\Z', get_lastpostmodified('GMT'), false); ?></dc:date>
-	<sy:updatePeriod><?php echo apply_filters( 'rss_update_period', 'hourly' ); ?></sy:updatePeriod>
-	<sy:updateFrequency><?php echo apply_filters( 'rss_update_frequency', '1' ); ?></sy:updateFrequency>
+	<admin:generatorAgent rdf:resource="http://wordpress.org/?v=<?php echo $wp_version ?>"/>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
 	<sy:updateBase>2000-01-01T12:00+00:00</sy:updateBase>
 	<?php do_action('rdf_header'); ?>
 	<items>
@@ -45,8 +42,8 @@ echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>'; ?>
 <?php if (get_option('rss_use_excerpt')) : ?>
 	<description><?php the_excerpt_rss() ?></description>
 <?php else : ?>
-	<description><?php the_excerpt_rss() ?></description>
-	<content:encoded><![CDATA[<?php the_content_feed('rdf') ?>]]></content:encoded>
+	<description><?php the_content_rss('', 0, '', get_option('rss_excerpt_length'), 2) ?></description>
+	<content:encoded><![CDATA[<?php the_content('', 0, '') ?>]]></content:encoded>
 <?php endif; ?>
 	<?php do_action('rdf_item'); ?>
 </item>
