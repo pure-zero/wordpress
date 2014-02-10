@@ -1,26 +1,67 @@
 <?php
-/*
- * atomlib.php - Atom Syndication Format PHP Library
+/**
+ * Atom Syndication Format PHP Library
  *
- * Project: http://code.google.com/p/phpatomlib/
+ * @package AtomLib
+ * @link http://code.google.com/p/phpatomlib/
  *
- * Author: Elias Torres <elias@torrez.us>
- * Version: 0.4
- *
+ * @author Elias Torres <elias@torrez.us>
+ * @version 0.4
+ * @since 2.3
  */
 
+/**
+ * Structure that store common Atom Feed Properties
+ *
+ * @package AtomLib
+ */
 class AtomFeed {
+	/**
+	 * Stores Links
+	 * @var array
+	 * @access public
+	 */
     var $links = array();
+    /**
+     * Stores Categories
+     * @var array
+     * @access public
+     */
     var $categories = array();
-
+	/**
+	 * Stores Entries
+	 *
+	 * @var array
+	 * @access public
+	 */
     var $entries = array();
 }
 
+/**
+ * Structure that store Atom Entry Properties
+ *
+ * @package AtomLib
+ */
 class AtomEntry {
+	/**
+	 * Stores Links
+	 * @var array
+	 * @access public
+	 */
     var $links = array();
+    /**
+     * Stores Categories
+     * @var array
+	 * @access public
+     */
     var $categories = array();
 }
 
+/**
+ * AtomLib Atom Parser API
+ *
+ * @package AtomLib
+ */
 class AtomParser {
 
     var $NS = 'http://www.w3.org/2005/Atom';
@@ -90,8 +131,8 @@ class AtomParser {
 
             if(!xml_parse($parser, $data, feof($fp))) {
                 trigger_error(sprintf(__('XML error: %s at line %d')."\n",
-                    xml_error_string(xml_get_error_code($xml_parser)),
-                    xml_get_current_line_number($xml_parser)));
+                    xml_error_string(xml_get_error_code($parser)),
+                    xml_get_current_line_number($parser)));
                 $ret = false;
                 break;
             }
@@ -309,5 +350,3 @@ class AtomParser {
                 $string );
     }
 }
-
-?>
