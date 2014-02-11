@@ -22,7 +22,7 @@ get_header(); ?>
 		<div id="primary" class="showcase">
 			<div id="content" role="main">
 
-				<?php while ( have_posts() ) : the_post(); ?>
+				<?php the_post(); ?>
 
 				<?php
 					/**
@@ -32,8 +32,6 @@ get_header(); ?>
 					if ( '' != get_the_content() )
 						get_template_part( 'content', 'intro' );
 				?>
-
-				<?php endwhile; ?>
 
 				<?php
 					/**

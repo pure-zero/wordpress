@@ -180,8 +180,7 @@ class WP_Http {
 		} else {
 			if ( is_array( $r['body'] ) || is_object( $r['body'] ) ) {
 				$r['body'] = http_build_query( $r['body'], null, '&' );
-				if ( ! isset( $r['headers']['Content-Type'] ) )
-					$r['headers']['Content-Type'] = 'application/x-www-form-urlencoded; charset=' . get_option( 'blog_charset' );
+				$r['headers']['Content-Type'] = 'application/x-www-form-urlencoded; charset=' . get_option( 'blog_charset' );
 				$r['headers']['Content-Length'] = strlen( $r['body'] );
 			}
 
@@ -223,7 +222,7 @@ class WP_Http {
 	/**
 	 * Dispatches a HTTP request to a supporting transport.
 	 *
-	 * Tests each transport in order to find a transport which matches the request arguments.
+	 * Tests each transport in order to find a transport which matches the request arguements.
 	 * Also caches the transport instance to be used later.
 	 *
 	 * The order for blocking requests is cURL, Streams, and finally Fsockopen.
@@ -254,7 +253,7 @@ class WP_Http {
 
 		$response = $transports[$class]->request( $url, $args );
 
-		do_action( 'http_api_debug', $response, 'response', $class, $args, $url );
+		do_action( 'http_api_debug', $response, 'response', $class );
 
 		if ( is_wp_error( $response ) )
 			return $response;
@@ -346,7 +345,7 @@ class WP_Http {
 	 * @return array Processed string headers. If duplicate headers are encountered,
 	 * 					Then a numbered array is returned as the value of that header-key.
 	 */
-	public static function processHeaders($headers) {
+	function processHeaders($headers) {
 		// split headers, one per array element
 		if ( is_string($headers) ) {
 			// tolerate line terminator: CRLF = LF (RFC 2616 19.3)
@@ -413,7 +412,7 @@ class WP_Http {
 	 *
 	 * @param array $r Full array of args passed into ::request()
 	 */
-	public static function buildCookieHeader( &$r ) {
+	function buildCookieHeader( &$r ) {
 		if ( ! empty($r['cookies']) ) {
 			$cookies_header = '';
 			foreach ( (array) $r['cookies'] as $cookie ) {
@@ -632,7 +631,7 @@ class WP_Http_Fsockopen {
 
 		$endDelay = time();
 
-		// If the delay is greater than the timeout then fsockopen shouldn't be used, because it will
+		// If the delay is greater than the timeout then fsockopen should't be used, because it will
 		// cause a long delay.
 		$elapseDelay = ($endDelay-$startDelay) > $r['timeout'];
 		if ( true === $elapseDelay )
@@ -756,7 +755,7 @@ class WP_Http_Fsockopen {
 	 * @static
 	 * @return boolean False means this class can not be used, true means it can.
 	 */
-	public static function test( $args = array() ) {
+	function test( $args = array() ) {
 		if ( ! function_exists( 'fsockopen' ) )
 			return false;
 
@@ -916,7 +915,7 @@ class WP_Http_Streams {
 		else
 			$processedHeaders = WP_Http::processHeaders($meta['wrapper_data']);
 
-		// Streams does not provide an error code which we can use to see why the request stream stopped.
+		// Streams does not provide an error code which we can use to see why the request stream stoped.
 		// We can however test to see if a location header is present and return based on that.
 		if ( isset($processedHeaders['headers']['location']) && 0 !== $args['_redirection'] )
 			return new WP_Error('http_request_failed', __('Too many redirects.'));
@@ -939,7 +938,7 @@ class WP_Http_Streams {
 	 *
 	 * @return boolean False means this class can not be used, true means it can.
 	 */
-	public static function test( $args = array() ) {
+	function test( $args = array() ) {
 		if ( ! function_exists( 'fopen' ) )
 			return false;
 
@@ -1032,7 +1031,7 @@ class WP_Http_Curl {
 
 
 		// CURLOPT_TIMEOUT and CURLOPT_CONNECTTIMEOUT expect integers.  Have to use ceil since
-		// a value of 0 will allow an unlimited timeout.
+		// a value of 0 will allow an ulimited timeout.
 		$timeout = (int) ceil( $r['timeout'] );
 		curl_setopt( $handle, CURLOPT_CONNECTTIMEOUT, $timeout );
 		curl_setopt( $handle, CURLOPT_TIMEOUT, $timeout );
@@ -1118,7 +1117,7 @@ class WP_Http_Curl {
 				return new WP_Error('http_request_failed', __('Too many redirects.'));
 		}
 
-		$this->headers = '';
+		unset( $this->headers );
 
 		$response = array();
 		$response['code'] = curl_getinfo( $handle, CURLINFO_HTTP_CODE );
@@ -1166,7 +1165,7 @@ class WP_Http_Curl {
 	 *
 	 * @return boolean False means this class can not be used, true means it can.
 	 */
-	public static function test( $args = array() ) {
+	function test( $args = array() ) {
 		if ( ! function_exists( 'curl_init' ) || ! function_exists( 'curl_exec' ) )
 			return false;
 
@@ -1580,7 +1579,7 @@ class WP_Http_Encoding {
 	 * @param string $supports Optional, not used. When implemented it will choose the right compression based on what the server supports.
 	 * @return string|bool False on failure.
 	 */
-	public static function compress( $raw, $level = 9, $supports = null ) {
+	function compress( $raw, $level = 9, $supports = null ) {
 		return gzdeflate( $raw, $level );
 	}
 
@@ -1598,7 +1597,7 @@ class WP_Http_Encoding {
 	 * @param int $length The optional length of the compressed data.
 	 * @return string|bool False on failure.
 	 */
-	public static function decompress( $compressed, $length = null ) {
+	function decompress( $compressed, $length = null ) {
 
 		if ( empty($compressed) )
 			return $compressed;
@@ -1626,25 +1625,17 @@ class WP_Http_Encoding {
 	 * Decompression of deflated string while staying compatible with the majority of servers.
 	 *
 	 * Certain Servers will return deflated data with headers which PHP's gziniflate()
-	 * function cannot handle out of the box. The following function has been created from
-	 * various snippets on the gzinflate() PHP documentation.
-	 *
-	 * Warning: Magic numbers within. Due to the potential different formats that the compressed
-	 * data may be returned in, some "magic offsets" are needed to ensure proper decompression
-	 * takes place. For a simple progmatic way to determine the magic offset in use, see:
-	 * http://core.trac.wordpress.org/ticket/18273
+	 * function cannot handle out of the box. The following function lifted from
+	 * http://au2.php.net/manual/en/function.gzinflate.php#77336 will attempt to deflate
+	 * the various return forms used.
 	 *
 	 * @since 2.8.1
-	 * @link http://core.trac.wordpress.org/ticket/18273
-	 * @link http://au2.php.net/manual/en/function.gzinflate.php#70875
 	 * @link http://au2.php.net/manual/en/function.gzinflate.php#77336
 	 *
 	 * @param string $gzData String to decompress.
 	 * @return string|bool False on failure.
 	 */
-	public static function compatible_gzinflate($gzData) {
-
-		// Compressed data might contain a full header, if so strip it for gzinflate()
+	function compatible_gzinflate($gzData) {
 		if ( substr($gzData, 0, 3) == "\x1f\x8b\x08" ) {
 			$i = 10;
 			$flg = ord( substr($gzData, 3, 1) );
@@ -1660,17 +1651,10 @@ class WP_Http_Encoding {
 				if ( $flg & 2 )
 					$i = $i + 2;
 			}
-			$decompressed = @gzinflate( substr($gzData, $i, -8) );
-			if ( false !== $decompressed )
-				return $decompressed;
+			return gzinflate( substr($gzData, $i, -8) );
+		} else {
+			return false;
 		}
-
-		// Compressed data from java.util.zip.Deflater amongst others.
-		$decompressed = @gzinflate( substr($gzData, 2) );
-		if ( false !== $decompressed )
-			return $decompressed;
-
-		return false;
 	}
 
 	/**
@@ -1680,7 +1664,7 @@ class WP_Http_Encoding {
 	 *
 	 * @return string Types of encoding to accept.
 	 */
-	public static function accept_encoding() {
+	function accept_encoding() {
 		$type = array();
 		if ( function_exists( 'gzinflate' ) )
 			$type[] = 'deflate;q=1.0';
@@ -1695,13 +1679,13 @@ class WP_Http_Encoding {
 	}
 
 	/**
-	 * What encoding the content used when it was compressed to send in the headers.
+	 * What enconding the content used when it was compressed to send in the headers.
 	 *
 	 * @since 2.8
 	 *
 	 * @return string Content-Encoding string to send in the header.
 	 */
-	public static function content_encoding() {
+	function content_encoding() {
 		return 'deflate';
 	}
 
@@ -1713,7 +1697,7 @@ class WP_Http_Encoding {
 	 * @param array|string $headers All of the available headers.
 	 * @return bool
 	 */
-	public static function should_decode($headers) {
+	function should_decode($headers) {
 		if ( is_array( $headers ) ) {
 			if ( array_key_exists('content-encoding', $headers) && ! empty( $headers['content-encoding'] ) )
 				return true;
@@ -1735,7 +1719,7 @@ class WP_Http_Encoding {
 	 *
 	 * @return bool
 	 */
-	public static function is_available() {
+	function is_available() {
 		return ( function_exists('gzuncompress') || function_exists('gzdeflate') || function_exists('gzinflate') );
 	}
 }
