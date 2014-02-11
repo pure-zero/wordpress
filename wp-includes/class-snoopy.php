@@ -1,17 +1,11 @@
 <?php
 
-/**
- * Deprecated. Use WP_HTTP (http.php, class-http.php) instead.
- */
-_deprecated_file( basename( __FILE__ ), '3.0', WPINC . '/http.php' );
-
-if ( !class_exists( 'Snoopy' ) ) :
 /*************************************************
 
 Snoopy - the PHP net client
 Author: Monte Ohrt <monte@ispi.net>
-Copyright (c): 1999-2008 New Digital Group, all rights reserved
-Version: 1.2.4
+Copyright (c): 1999-2000 ispi, all rights reserved
+Version: 1.01
 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,13 +22,20 @@ Version: 1.2.4
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 You may contact the author of Snoopy by e-mail at:
-monte@ohrt.com
+monte@ispi.net
+
+Or, write to:
+Monte Ohrt
+CTO, ispi
+237 S. 70th suite 220
+Lincoln, NE 68510
 
 The latest version of Snoopy can be obtained from:
 http://snoopy.sourceforge.net/
 
 *************************************************/
 
+if ( !in_array('Snoopy', get_declared_classes() ) ) :
 class Snoopy
 {
 	/**** Public variables ****/
@@ -48,7 +49,7 @@ class Snoopy
 	var $proxy_user		=	"";					// proxy user to use
 	var $proxy_pass		=	"";					// proxy password to use
 
-	var $agent			=	"Snoopy v1.2.4";	// agent we masquerade as
+	var $agent			=	"Snoopy v1.2.3";	// agent we masquerade as
 	var	$referer		=	"";					// referer info to pass
 	var $cookies		=	array();			// array of cookies to pass
 												// $cookies["username"]="joe";
@@ -77,7 +78,7 @@ class Snoopy
 	var $error			=	"";					// error messages sent here
 	var	$response_code	=	"";					// response code returned from server
 	var	$headers		=	array();			// headers returned from server sent here
-	var	$maxlength		=	500000;				// max return data length (body)
+	var	$maxlength		=	8192;				// max return data length (body)
 	var $read_timeout	=	0;					// timeout on read operations, in seconds
 												// supported only since PHP 4 Beta 4
 												// set to 0 to disallow timeouts
@@ -719,13 +720,13 @@ class Snoopy
 							chr(176),
 							chr(39),
 							chr(128),
-							chr(0xE4), // ANSI &auml;
-							chr(0xF6), // ANSI &ouml;
-							chr(0xFC), // ANSI &uuml;
-							chr(0xC4), // ANSI &Auml;
-							chr(0xD6), // ANSI &Ouml;
-							chr(0xDC), // ANSI &Uuml;
-							chr(0xDF), // ANSI &szlig;
+							"ä",
+							"ö",
+							"ü",
+							"Ä",
+							"Ö",
+							"Ü",
+							"ß",
 						);
 
 		$text = preg_replace($search,$replace,$document);
@@ -910,7 +911,7 @@ class Snoopy
 			return false;
 		}
 
-		// check if there is a redirect meta tag
+		// check if there is a a redirect meta tag
 
 		if(preg_match("'<meta[\s]*http-equiv[^>]*?content[\s]*=[\s]*[\"\']?\d+;[\s]*URL[\s]*=[\s]*([^\"\']*?)[\"\']?>'i",$results,$match))
 
@@ -1010,9 +1011,10 @@ class Snoopy
 		if($this->read_timeout > 0)
 			$cmdline_params .= " -m ".$this->read_timeout;
 
-		$headerfile = tempnam($this->temp_dir, "sno");
+		$headerfile = tempnam($temp_dir, "sno");
 
-		exec($this->curl_path." -k -D \"$headerfile\"".$cmdline_params." \"".escapeshellcmd($URI)."\"",$results,$return);
+		$safer_URI = strtr( $URI, "\"", " " ); // strip quotes from the URI to avoid shell access
+		exec(escapeshellcmd($this->curl_path." -D \"$headerfile\"".$cmdline_params." \"".$safer_URI."\""),$results,$return);
 
 		if($return)
 		{
@@ -1057,7 +1059,7 @@ class Snoopy
 			$this->headers[] = $result_headers[$currentHeader];
 		}
 
-		// check if there is a redirect meta tag
+		// check if there is a a redirect meta tag
 
 		if(preg_match("'<meta[\s]*http-equiv[^>]*?content[\s]*=[\s]*[\"\']?\d+;[\s]*URL[\s]*=[\s]*([^\"\']*?)[\"\']?>'i",$results,$match))
 		{
@@ -1236,7 +1238,9 @@ class Snoopy
 						if (!is_readable($file_name)) continue;
 
 						$fp = fopen($file_name, "r");
-						$file_content = fread($fp, filesize($file_name));
+						while (!feof($fp)) {
+							$file_content .= fread($fp, filesize($file_name));
+						}
 						fclose($fp);
 						$base_name = basename($file_name);
 
@@ -1253,4 +1257,5 @@ class Snoopy
 	}
 }
 endif;
+
 ?>
