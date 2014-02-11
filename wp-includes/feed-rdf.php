@@ -1,10 +1,15 @@
 <?php
-header('Content-type: application/rdf+xml; charset=' . get_option('blog_charset'), true);
+/**
+ * RSS 1 RDF Feed Template for displaying RSS 1 Posts feed.
+ *
+ * @package WordPress
+ */
+
+header('Content-Type: application/rdf+xml; charset=' . get_option('blog_charset'), true);
 $more = 1;
 
 ?>
 <?php echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>'; ?>
-<!-- generator="wordpress/<?php echo $wp_version ?>" -->
 <rdf:RDF
 	xmlns="http://purl.org/rss/1.0/"
 	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -19,7 +24,7 @@ $more = 1;
 	<link><?php bloginfo_rss('url') ?></link>
 	<description><?php bloginfo_rss('description') ?></description>
 	<dc:date><?php echo mysql2date('Y-m-d\TH:i:s\Z', get_lastpostmodified('GMT'), false); ?></dc:date>
-	<admin:generatorAgent rdf:resource="http://wordpress.org/?v=<?php echo $wp_version ?>"/>
+	<?php the_generator( 'rdf' ); ?>
 	<sy:updatePeriod>hourly</sy:updatePeriod>
 	<sy:updateFrequency>1</sy:updateFrequency>
 	<sy:updateBase>2000-01-01T12:00+00:00</sy:updateBase>
@@ -27,15 +32,15 @@ $more = 1;
 	<items>
 		<rdf:Seq>
 		<?php while (have_posts()): the_post(); ?>
-			<rdf:li rdf:resource="<?php permalink_single_rss() ?>"/>
+			<rdf:li rdf:resource="<?php the_permalink_rss() ?>"/>
 		<?php endwhile; ?>
 		</rdf:Seq>
 	</items>
 </channel>
 <?php rewind_posts(); while (have_posts()): the_post(); ?>
-<item rdf:about="<?php permalink_single_rss() ?>">
+<item rdf:about="<?php the_permalink_rss() ?>">
 	<title><?php the_title_rss() ?></title>
-	<link><?php permalink_single_rss() ?></link>
+	<link><?php the_permalink_rss() ?></link>
 	 <dc:date><?php echo mysql2date('Y-m-d\TH:i:s\Z', $post->post_date_gmt, false); ?></dc:date>
 	<dc:creator><?php the_author() ?></dc:creator>
 	<?php the_category_rss('rdf') ?>

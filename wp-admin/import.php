@@ -14,9 +14,9 @@ require_once ('admin-header.php');
 // Load all importers so that they can register.
 $import_loc = 'wp-admin/import';
 $import_root = ABSPATH.$import_loc;
-$imports_dir = @ dir($import_root);
+$imports_dir = @ opendir($import_root);
 if ($imports_dir) {
-	while (($file = $imports_dir->read()) !== false) {
+	while (($file = readdir($imports_dir)) !== false) {
 		if ($file{0} == '.') {
 			continue;
 		} elseif (substr($file, -4) == '.php') {
@@ -24,6 +24,7 @@ if ($imports_dir) {
 		}
 	}
 }
+@closedir($imports_dir);
 
 $importers = get_importers();
 
@@ -43,7 +44,7 @@ if (empty ($importers)) {
 			$style = 'class="'.$style.'"';
 		echo "
 			<tr $style>
-				<td class='import-system'>$action</td>
+				<td class='import-system row-title'>$action</td>
 				<td class='desc'>{$data[1]}</td>
 			</tr>";
 	}

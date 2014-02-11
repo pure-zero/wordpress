@@ -2,16 +2,21 @@
 
 function get_bloginfo_rss($show = '') {
 	$info = strip_tags(get_bloginfo($show));
-	return apply_filters('get_bloginfo_rss', convert_chars($info));
+	return apply_filters('get_bloginfo_rss', convert_chars($info), $show);
 }
 
-
 function bloginfo_rss($show = '') {
-	echo apply_filters('bloginfo_rss', get_bloginfo_rss($show));
+	echo apply_filters('bloginfo_rss', get_bloginfo_rss($show), $show);
+}
+
+function get_default_feed() {
+	return apply_filters('default_feed', 'rss2');
 }
 
 function get_wp_title_rss($sep = '&#187;') {
 	$title = wp_title($sep, false);
+	if ( is_wp_error( $title ) )
+		return $title->get_error_message();
 	$title = apply_filters('get_wp_title_rss', $title);
 	return $title;
 }
@@ -22,7 +27,6 @@ function wp_title_rss($sep = '&#187;') {
 
 function get_the_title_rss() {
 	$title = get_the_title();
-	$title = apply_filters('the_title', $title);
 	$title = apply_filters('the_title_rss', $title);
 	return $title;
 }
@@ -66,30 +70,39 @@ function the_content_rss($more_link_text='(more...)', $stripteaser=0, $more_file
 
 
 function the_excerpt_rss() {
-	$output = get_the_excerpt(true);
+	$output = get_the_excerpt();
 	echo apply_filters('the_excerpt_rss', $output);
 }
 
+function the_permalink_rss() {
+	echo apply_filters('the_permalink_rss', get_permalink());
 
-function permalink_single_rss($file = '') {
-	echo get_permalink();
 }
 
+function comment_guid() {
+	echo get_comment_guid();
+}
+
+function get_comment_guid() {
+	global $comment;
+
+	if ( !is_object($comment) )
+		return false;
+
+	return get_the_guid($comment->comment_post_ID) . '#comment-' . $comment->comment_ID;
+}
 
 function comment_link() {
 	echo get_comment_link();
 }
 
-
 function get_comment_author_rss() {
 	return apply_filters('comment_author_rss', get_comment_author() );
 }
 
-
 function comment_author_rss() {
 	echo get_comment_author_rss();
 }
-
 
 function comment_text_rss() {
 	$comment_text = get_comment_text();
@@ -97,71 +110,37 @@ function comment_text_rss() {
 	echo $comment_text;
 }
 
-
-function comments_rss_link($link_text = 'Comments RSS', $commentsrssfilename = 'nolongerused') {
-	$url = get_post_comments_feed_link();
-	echo "<a href='$url'>$link_text</a>";
-}
-
-
-function comments_rss($commentsrssfilename = 'nolongerused') {
-	return get_post_comments_feed_link();
-}
-
-
-function get_author_rss_link($echo = false, $author_id, $author_nicename) {
-	$auth_ID = (int) $author_id;
-	$permalink_structure = get_option('permalink_structure');
-
-	if ( '' == $permalink_structure ) {
-		$link = get_option('home') . '?feed=rss2&amp;author=' . $author_id;
-	} else {
-		$link = get_author_posts_url($author_id, $author_nicename);
-		$link = $link . user_trailingslashit('feed', 'feed');
-	}
-
-	$link = apply_filters('author_feed_link', $link);
-
-	if ( $echo )
-		echo $link;
-	return $link;
-}
-
-
-function get_category_rss_link($echo = false, $cat_ID, $category_nicename) {
-	$permalink_structure = get_option('permalink_structure');
-
-	if ( '' == $permalink_structure ) {
-		$link = get_option('home') . '?feed=rss2&amp;cat=' . $cat_ID;
-	} else {
-		$link = get_category_link($cat_ID);
-		$link = $link . user_trailingslashit('feed', 'feed');
-	}
-
-	$link = apply_filters('category_feed_link', $link);
-
-	if ( $echo )
-		echo $link;
-	return $link;
-}
-
-
 function get_the_category_rss($type = 'rss') {
 	$categories = get_the_category();
-	$home = get_bloginfo_rss('home');
+	$tags = get_the_tags();
 	$the_list = '';
-	foreach ( (array) $categories as $category ) {
-		$cat_name = convert_chars($category->cat_name);
+	$cat_names = array();
+
+	$filter = 'rss';
+	if ( 'atom' == $type )
+		$filter = 'raw';
+
+	if ( !empty($categories) ) foreach ( (array) $categories as $category ) {
+		$cat_names[] = sanitize_term_field('name', $category->name, $category->term_id, 'category', $filter);
+	}
+
+	if ( !empty($tags) ) foreach ( (array) $tags as $tag ) {
+		$cat_names[] = sanitize_term_field('name', $tag->name, $tag->term_id, 'post_tag', $filter);
+	}
+
+	$cat_names = array_unique($cat_names);
+
+	foreach ( $cat_names as $cat_name ) {
 		if ( 'rdf' == $type )
 			$the_list .= "\n\t\t<dc:subject><![CDATA[$cat_name]]></dc:subject>\n";
-		if ( 'atom' == $type )
-			$the_list .= sprintf( '<category scheme="%1$s" term="%2$s" />', attribute_escape( apply_filters( 'get_bloginfo_rss', get_bloginfo( 'url' ) ) ), attribute_escape( $category->cat_name ) );
+		elseif ( 'atom' == $type )
+			$the_list .= sprintf( '<category scheme="%1$s" term="%2$s" />', attribute_escape( apply_filters( 'get_bloginfo_rss', get_bloginfo( 'url' ) ) ), attribute_escape( $cat_name ) );
 		else
 			$the_list .= "\n\t\t<category><![CDATA[$cat_name]]></category>\n";
 	}
+
 	return apply_filters('the_category_rss', $the_list, $type);
 }
-
 
 function the_category_rss($type = 'rss') {
 	echo get_the_category_rss($type);
@@ -178,8 +157,8 @@ function html_type_rss() {
 
 
 function rss_enclosure() {
-	global $id, $post;
-	if ( !empty($post->post_password) && ($_COOKIE['wp-postpass_'.COOKIEHASH] != $post->post_password) )
+	global $post;
+	if ( !empty($post->post_password) && (!isset($_COOKIE['wp-postpass_'.COOKIEHASH]) || $_COOKIE['wp-postpass_'.COOKIEHASH] != $post->post_password) )
 		return;
 
 	foreach (get_post_custom() as $key => $val) {
@@ -193,7 +172,7 @@ function rss_enclosure() {
 }
 
 function atom_enclosure() {
-	global $id, $post;
+	global $post;
 	if ( !empty($post->post_password) && ($_COOKIE['wp-postpass_'.COOKIEHASH] != $post->post_password) )
 		return;
 
@@ -205,6 +184,68 @@ function atom_enclosure() {
 			}
 		}
 	}
+}
+
+/**
+ * prep_atom_text_construct() - Determine the type of a given string of data
+ *
+ * Tell whether the type is text, html, or xhtml, per RFC 4287 section 3.1.
+ *
+ * In the case of WordPress, text is defined as containing no markup,
+ * xhtml is defined as "well formed", and html as tag soup (i.e., the rest).
+ *
+ * Container div tags are added to xhtml values, per section 3.1.1.3.
+ *
+ * @link http://www.atomenabled.org/developers/syndication/atom-format-spec.php#rfc.section.3.1
+ *
+ * @package WordPress
+ * @subpackage Feed
+ * @since 2.5
+ *
+ * @param string $data input string
+ * @return array $result array(type, value)
+ */
+function prep_atom_text_construct($data) {
+	if (strpos($data, '<') === false && strpos($data, '&') === false) {
+		return array('text', $data);
+	}
+
+	$parser = xml_parser_create();
+	xml_parse($parser, '<div>' . $data . '</div>', true);
+	$code = xml_get_error_code($parser);
+	xml_parser_free($parser);
+
+	if (!$code) {
+		if (strpos($data, '<') === false) {
+			return array('text', $data);
+		} else {
+			$data = "<div xmlns='http://www.w3.org/1999/xhtml'>$data</div>";
+			return array('xhtml', $data);
+		}
+	}
+
+	if (strpos($data, ']]>') == false) {
+		return array('html', "<![CDATA[$data]]>");
+	} else {
+		return array('html', htmlspecialchars($data));
+	}
+}
+
+/**
+ * self_link() - Generate a correct link for the atom:self elemet
+ *
+ * Echo the link for the currently displayed feed in a XSS safe way.
+ *
+ * @package WordPress
+ * @subpackage Feed
+ * @since 2.5
+ *
+ */
+function self_link() {
+	echo 'http'
+		. ( $_SERVER['https'] == 'on' ? 's' : '' ) . '://'
+		. $_SERVER['HTTP_HOST']
+		. wp_specialchars(stripslashes($_SERVER['REQUEST_URI']), 1);
 }
 
 ?>

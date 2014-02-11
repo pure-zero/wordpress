@@ -18,26 +18,50 @@ function get_the_ID() {
 
 function the_title($before = '', $after = '', $echo = true) {
 	$title = get_the_title();
-	if ( strlen($title) > 0 ) {
-		$title = apply_filters('the_title', $before . $title . $after, $before, $after);
-		if ( $echo )
-			echo $title;
-		else
-			return $title;
-	}
+
+	if ( strlen($title) == 0 )
+		return;
+
+	$title = $before . $title . $after;
+
+	if ( $echo )
+		echo $title;
+	else
+		return $title;
 }
 
+function the_title_attribute( $args = '' ) {
+	$title = get_the_title();
 
-function get_the_title($id = 0) {
+	if ( strlen($title) == 0 )
+		return;
+
+	$defaults = array('before' => '', 'after' =>  '', 'echo' => true);
+	$r = wp_parse_args($args, $defaults);
+	extract( $r, EXTR_SKIP );
+
+
+	$title = $before . $title . $after;
+	$title = attribute_escape(strip_tags($title));
+
+	if ( $echo )
+		echo $title;
+	else
+		return $title;
+}
+
+function get_the_title( $id = 0 ) {
 	$post = &get_post($id);
 
 	$title = $post->post_title;
-	if ( !empty($post->post_password) )
-		$title = sprintf(__('Protected: %s'), $title);
-	else if ( 'private' == $post->post_status )
-		$title = sprintf(__('Private: %s'), $title);
 
-	return $title;
+	if ( !is_admin() ) {
+		if ( !empty($post->post_password) )
+			$title = sprintf(__('Protected: %s'), $title);
+		else if ( isset($post->post_status) && 'private' == $post->post_status )
+			$title = sprintf(__('Private: %s'), $title);
+	}
+	return apply_filters( 'the_title', $title );
 }
 
 function the_guid( $id = 0 ) {
@@ -59,13 +83,12 @@ function the_content($more_link_text = '(more...)', $stripteaser = 0, $more_file
 
 
 function get_the_content($more_link_text = '(more...)', $stripteaser = 0, $more_file = '') {
-	global $id, $post, $more, $single, $withcomments, $page, $pages, $multipage, $numpages;
-	global $preview;
-	global $pagenow;
+	global $id, $post, $more, $page, $pages, $multipage, $preview, $pagenow;
+
 	$output = '';
 
 	if ( !empty($post->post_password) ) { // if there's a password
-		if ( stripslashes($_COOKIE['wp-postpass_'.COOKIEHASH]) != $post->post_password ) {	// and it doesn't match the cookie
+		if ( !isset($_COOKIE['wp-postpass_'.COOKIEHASH]) || stripslashes($_COOKIE['wp-postpass_'.COOKIEHASH]) != $post->post_password ) {	// and it doesn't match the cookie
 			$output = get_the_password_form();
 			return $output;
 		}
@@ -115,12 +138,12 @@ function the_excerpt() {
 }
 
 
-function get_the_excerpt($fakeit = true) {
-	global $id, $post;
+function get_the_excerpt($deprecated = '') {
+	global $post;
 	$output = '';
 	$output = $post->post_excerpt;
 	if ( !empty($post->post_password) ) { // if there's a password
-		if ( $_COOKIE['wp-postpass_'.COOKIEHASH] != $post->post_password ) {  // and it doesn't match the cookie
+		if ( !isset($_COOKIE['wp-postpass_'.COOKIEHASH]) || $_COOKIE['wp-postpass_'.COOKIEHASH] != $post->post_password ) {  // and it doesn't match the cookie
 			$output = __('There is no excerpt because this is a protected post.');
 			return $output;
 		}
@@ -129,21 +152,23 @@ function get_the_excerpt($fakeit = true) {
 	return apply_filters('get_the_excerpt', $output);
 }
 
+function has_excerpt( $id = 0 ) {
+	$post = &get_post( $id );
+	return ( !empty( $post->post_excerpt ) );
+}
 
 function wp_link_pages($args = '') {
-	global $post;
+	$defaults = array(
+		'before' => '<p>' . __('Pages:'), 'after' => '</p>',
+		'next_or_number' => 'number', 'nextpagelink' => __('Next page'),
+		'previouspagelink' => __('Previous page'), 'pagelink' => '%',
+		'more_file' => '', 'echo' => 1
+	);
 
-	if ( is_array($args) )
-		$r = &$args;
-	else
-		parse_str($args, $r);
+	$r = wp_parse_args( $args, $defaults );
+	extract( $r, EXTR_SKIP );
 
-	$defaults = array('before' => '<p>' . __('Pages:'), 'after' => '</p>', 'next_or_number' => 'number', 'nextpagelink' => __('Next page'),
-			'previouspagelink' => __('Previous page'), 'pagelink' => '%', 'more_file' => '', 'echo' => 1);
-	$r = array_merge($defaults, $r);
-	extract($r, EXTR_SKIP);
-
-	global $id, $page, $numpages, $multipage, $more, $pagenow;
+	global $post, $page, $numpages, $multipage, $more, $pagenow;
 	if ( $more_file != '' )
 		$file = $more_file;
 	else
@@ -160,7 +185,7 @@ function wp_link_pages($args = '') {
 					if ( 1 == $i ) {
 						$output .= '<a href="' . get_permalink() . '">';
 					} else {
-						if ( '' == get_option('permalink_structure') || 'draft' == $post->post_status )
+						if ( '' == get_option('permalink_structure') || in_array($post->post_status, array('draft', 'pending')) )
 							$output .= '<a href="' . get_permalink() . '&amp;page=' . $i . '">';
 						else
 							$output .= '<a href="' . trailingslashit(get_permalink()) . user_trailingslashit($i, 'single_paged') . '">';
@@ -179,7 +204,7 @@ function wp_link_pages($args = '') {
 					if ( 1 == $i ) {
 						$output .= '<a href="' . get_permalink() . '">' . $previouspagelink . '</a>';
 					} else {
-						if ( '' == get_option('permalink_structure') || 'draft' == $post->post_status )
+						if ( '' == get_option('permalink_structure') || in_array($post->post_status, array('draft', 'pending')) )
 							$output .= '<a href="' . get_permalink() . '&amp;page=' . $i . '">' . $previouspagelink . '</a>';
 						else
 							$output .= '<a href="' . trailingslashit(get_permalink()) . user_trailingslashit($i, 'single_paged') . '">' . $previouspagelink . '</a>';
@@ -190,7 +215,7 @@ function wp_link_pages($args = '') {
 					if ( 1 == $i ) {
 						$output .= '<a href="' . get_permalink() . '">' . $nextpagelink . '</a>';
 					} else {
-						if ( '' == get_option('permalink_structure') || 'draft' == $post->post_status )
+						if ( '' == get_option('permalink_structure') || in_array($post->post_status, array('draft', 'pending')) )
 							$output .= '<a href="' . get_permalink() . '&amp;page=' . $i . '">' . $nextpagelink . '</a>';
 						else
 							$output .= '<a href="' . trailingslashit(get_permalink()) . user_trailingslashit($i, 'single_paged') . '">' . $nextpagelink . '</a>';
@@ -225,8 +250,6 @@ function post_custom( $key = '' ) {
 
 // this will probably change at some point...
 function the_meta() {
-	global $id;
-
 	if ( $keys = get_post_custom_keys() ) {
 		echo "<ul class='post-meta'>\n";
 		foreach ( $keys as $key ) {
@@ -247,15 +270,14 @@ function the_meta() {
 //
 
 function wp_dropdown_pages($args = '') {
-	if ( is_array($args) )
-		$r = &$args;
-	else
-		parse_str($args, $r);
+	$defaults = array(
+		'depth' => 0, 'child_of' => 0,
+		'selected' => 0, 'echo' => 1,
+		'name' => 'page_id', 'show_option_none' => ''
+	);
 
-	$defaults = array('depth' => 0, 'child_of' => 0, 'selected' => 0, 'echo' => 1,
-		'name' => 'page_id', 'show_option_none' => '');
-	$r = array_merge($defaults, $r);
-	extract($r, EXTR_SKIP);
+	$r = wp_parse_args( $args, $defaults );
+	extract( $r, EXTR_SKIP );
 
 	$pages = get_pages($r);
 	$output = '';
@@ -277,14 +299,16 @@ function wp_dropdown_pages($args = '') {
 }
 
 function wp_list_pages($args = '') {
-	if ( is_array($args) )
-		$r = &$args;
-	else
-		parse_str($args, $r);
+	$defaults = array(
+		'depth' => 0, 'show_date' => '',
+		'date_format' => get_option('date_format'),
+		'child_of' => 0, 'exclude' => '',
+		'title_li' => __('Pages'), 'echo' => 1,
+		'authors' => '', 'sort_column' => 'menu_order, post_title'
+	);
 
-	$defaults = array('depth' => 0, 'show_date' => '', 'date_format' => get_option('date_format'),
-		'child_of' => 0, 'exclude' => '', 'title_li' => __('Pages'), 'echo' => 1, 'authors' => '', 'sort_column' => 'menu_order, post_title');
-	$r = array_merge($defaults, $r);
+	$r = wp_parse_args( $args, $defaults );
+	extract( $r, EXTR_SKIP );
 
 	$output = '';
 	$current_page = 0;
@@ -296,6 +320,7 @@ function wp_list_pages($args = '') {
 	$r['exclude'] = implode(',', apply_filters('wp_list_pages_excludes', explode(',', $r['exclude'])));
 
 	// Query pages.
+	$r['hierarchical'] = 0;
 	$pages = get_pages($r);
 
 	if ( !empty($pages) ) {
@@ -303,7 +328,7 @@ function wp_list_pages($args = '') {
 			$output .= '<li class="pagenav">' . $r['title_li'] . '<ul>';
 
 		global $wp_query;
-		if ( is_page() )
+		if ( is_page() || $wp_query->is_posts_page )
 			$current_page = $wp_query->get_queried_object_id();
 		$output .= walk_page_tree($pages, $r['depth'], $current_page, $r);
 
@@ -339,16 +364,44 @@ function walk_page_dropdown_tree() {
 // Attachments
 //
 
-function the_attachment_link($id = 0, $fullsize = false, $max_dims = false) {
-	echo get_the_attachment_link($id, $fullsize, $max_dims);
+function the_attachment_link($id = 0, $fullsize = false, $deprecated = false, $permalink = false) {
+	if ( $fullsize )
+		echo wp_get_attachment_link($id, 'full', $permalink);
+	else
+		echo wp_get_attachment_link($id, 'thumbnail', $permalink);
 }
 
-function get_the_attachment_link($id = 0, $fullsize = false, $max_dims = false) {
+// get an attachment page link using an image or icon if possible
+function wp_get_attachment_link($id = 0, $size = 'thumbnail', $permalink = false, $icon = false) {
+	$id = intval($id);
+	$_post = & get_post( $id );
+
+	if ( ('attachment' != $_post->post_type) || !$url = wp_get_attachment_url($_post->ID) )
+		return __('Missing Attachment');
+
+	if ( $permalink )
+		$url = get_attachment_link($_post->ID);
+
+	$post_title = attribute_escape($_post->post_title);
+
+	$link_text = wp_get_attachment_image($id, $size, $icon);
+	if ( !$link_text )
+		$link_text = $_post->post_title;
+
+	return "<a href='$url' title='$post_title'>$link_text</a>";
+
+}
+
+// deprecated - use wp_get_attachment_link()
+function get_the_attachment_link($id = 0, $fullsize = false, $max_dims = false, $permalink = false) {
 	$id = (int) $id;
 	$_post = & get_post($id);
 
 	if ( ('attachment' != $_post->post_type) || !$url = wp_get_attachment_url($_post->ID) )
 		return __('Missing Attachment');
+
+	if ( $permalink )
+		$url = get_attachment_link($_post->ID);
 
 	$post_title = attribute_escape($_post->post_title);
 
@@ -356,20 +409,19 @@ function get_the_attachment_link($id = 0, $fullsize = false, $max_dims = false) 
 	return "<a href='$url' title='$post_title'>$innerHTML</a>";
 }
 
+
+// deprecated: use wp_get_attachment_image_src()
 function get_attachment_icon_src( $id = 0, $fullsize = false ) {
 	$id = (int) $id;
 	if ( !$post = & get_post($id) )
 		return false;
 
-	$imagedata = wp_get_attachment_metadata( $post->ID );
-
 	$file = get_attached_file( $post->ID );
 
-	if ( !$fullsize && $thumbfile = wp_get_attachment_thumb_file( $post->ID ) ) {
+	if ( !$fullsize && $src = wp_get_attachment_thumb_url( $post->ID ) ) {
 		// We have a thumbnail desired, specified and existing
 
-		$src = wp_get_attachment_thumb_url( $post->ID );
-		$src_file = $thumbfile;
+		$src_file = basename($src);
 		$class = 'attachmentthumb';
 	} elseif ( wp_attachment_is_image( $post->ID ) ) {
 		// We have an image without a thumbnail
@@ -390,11 +442,12 @@ function get_attachment_icon_src( $id = 0, $fullsize = false ) {
 	return array($src, $src_file);
 }
 
+// deprecated: use wp_get_attachment_image()
 function get_attachment_icon( $id = 0, $fullsize = false, $max_dims = false ) {
 	$id = (int) $id;
 	if ( !$post = & get_post($id) )
 		return false;
-
+		
 	if ( !$src = get_attachment_icon_src( $post->ID, $fullsize ) )
 		return false;
 
@@ -420,7 +473,10 @@ function get_attachment_icon( $id = 0, $fullsize = false, $max_dims = false ) {
 			}
 		} else {
 			$post->iconsize = array($imagesize[0], $imagesize[1]);
+			$constraint = '';
 		}
+	} else {
+		$constraint = '';
 	}
 
 	$post_title = attribute_escape($post->post_title);
@@ -430,6 +486,7 @@ function get_attachment_icon( $id = 0, $fullsize = false, $max_dims = false ) {
 	return apply_filters( 'attachment_icon', $icon, $post->ID );
 }
 
+// deprecated: use wp_get_attachment_image()
 function get_attachment_innerHTML($id = 0, $fullsize = false, $max_dims = false) {
 	$id = (int) $id;
 	if ( !$post = & get_post($id) )
@@ -445,8 +502,14 @@ function get_attachment_innerHTML($id = 0, $fullsize = false, $max_dims = false)
 }
 
 function prepend_attachment($content) {
+	global $post;
+
+	if ( empty($post->post_type) || $post->post_type != 'attachment' )
+		return $content;
+
 	$p = '<p class="attachment">';
-	$p .= get_the_attachment_link(false, true, array(400, 300));
+	// show the medium sized image representation of the attachment if available, and link to the raw file
+	$p .= wp_get_attachment_link(0, 'medium', false);
 	$p .= '</p>';
 	$p = apply_filters('prepend_attachment', $p);
 
@@ -458,12 +521,48 @@ function prepend_attachment($content) {
 //
 
 function get_the_password_form() {
+	global $post;
+	$label = 'pwbox-'.(empty($post->ID) ? rand() : $post->ID);
 	$output = '<form action="' . get_option('siteurl') . '/wp-pass.php" method="post">
 	<p>' . __("This post is password protected. To view it please enter your password below:") . '</p>
-	<p><label>' . __("Password:") . ' <input name="post_password" type="password" size="20" /></label> <input type="submit" name="Submit" value="' . __("Submit") . '" /></p>
+	<p><label for="' . $label . '">' . __("Password:") . ' <input name="post_password" id="' . $label . '" type="password" size="20" /></label> <input type="submit" name="Submit" value="' . __("Submit") . '" /></p>
 	</form>
 	';
 	return $output;
+}
+
+/**
+ * is_page_template() - Determine wether or not we are in a page template
+ *
+ * This template tag allows you to determine wether or not you are in a page template.
+ * You can optional provide a template name and then the check will be specific to
+ * that template.
+ *
+ * @package Template Tags
+ * @global object $wp_query
+ * @param string $template The specific template name if specific matching is required
+ */
+function is_page_template($template = '') {
+	if (!is_page()) {
+		return false;
+	}
+
+	global $wp_query;
+
+	$page = $wp_query->get_queried_object();
+	$custom_fields = get_post_custom_values('_wp_page_template',$page->ID);
+	$page_template = $custom_fields[0];
+
+	// We have no argument passed so just see if a page_template has been specified
+	if ( empty( $template ) ) {
+		if (!empty( $page_template ) ) {
+			return true;
+		}
+	} elseif ( $template == $page_template) {
+		return true;
+	}
+
+	return false;
 }
 
 ?>

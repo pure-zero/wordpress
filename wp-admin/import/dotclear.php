@@ -7,18 +7,6 @@
 /**
 	Add These Functions to make our lives easier
 **/
-if(!function_exists('get_catbynicename'))
-{
-	function get_catbynicename($category_nicename)
-	{
-	global $wpdb;
-
-	$cat_id -= 0; 	// force numeric
-	$name = $wpdb->get_var('SELECT cat_ID FROM '.$wpdb->categories.' WHERE category_nicename="'.$category_nicename.'"');
-
-	return $name;
-	}
-}
 
 if(!function_exists('get_comment_count'))
 {
@@ -26,15 +14,6 @@ if(!function_exists('get_comment_count'))
 	{
 		global $wpdb;
 		return $wpdb->get_var('SELECT count(*) FROM '.$wpdb->comments.' WHERE comment_post_ID = '.$post_ID);
-	}
-}
-
-if(!function_exists('link_cat_exists'))
-{
-	function link_cat_exists($catname)
-	{
-		global $wpdb;
-		return $wpdb->get_var('SELECT cat_id FROM '.$wpdb->linkcategories.' WHERE cat_name = "'.$wpdb->escape($catname).'"');
 	}
 }
 
@@ -130,26 +109,26 @@ function textconv ($s) {
 **/
 class Dotclear_Import {
 
-	function header() 
+	function header()
 	{
 		echo '<div class="wrap">';
 		echo '<h2>'.__('Import DotClear').'</h2>';
 		echo '<p>'.__('Steps may take a few minutes depending on the size of your database. Please be patient.').'</p>';
 	}
 
-	function footer() 
+	function footer()
 	{
 		echo '</div>';
 	}
 
-	function greet() 
+	function greet()
 	{
 		echo '<div class="narrow"><p>'.__('Howdy! This importer allows you to extract posts from a DotClear database into your blog.  Mileage may vary.').'</p>';
 		echo '<p>'.__('Your DotClear Configuration settings are as follows:').'</p>';
 		echo '<form action="admin.php?import=dotclear&amp;step=1" method="post">';
 		wp_nonce_field('import-dotclear');
 		$this->db_form();
-		echo '<p class="submit"><input type="submit" name="submit" value="'.attribute_escape(__('Import Categories &raquo;')).'" /></p>';
+		echo '<p class="submit"><input type="submit" name="submit" value="'.attribute_escape(__('Import Categories')).'" /></p>';
 		echo '</form></div>';
 	}
 
@@ -246,7 +225,7 @@ class Dotclear_Import {
 
 			// Store category translation for future use
 			add_option('dccat2wpcat',$dccat2wpcat);
-			echo '<p>'.sprintf(__('Done! <strong>%1$s</strong> categories imported.'), $count).'<br /><br /></p>';
+			echo '<p>'.sprintf(__ngettext('Done! <strong>%1$s</strong> category imported.', 'Done! <strong>%1$s</strong> categories imported.', $count), $count).'<br /><br /></p>';
 			return true;
 		}
 		echo __('No Categories to Import!');
@@ -385,6 +364,8 @@ class Dotclear_Import {
 							'ping_status'		=> $comment_status_map[$post_open_tb],
 							'comment_count'		=> $post_nb_comment + $post_nb_trackback)
 							);
+					if ( is_wp_error( $ret_id ) )
+						return $ret_id;
 				}
 				else
 				{
@@ -403,12 +384,17 @@ class Dotclear_Import {
 							'ping_status'		=> $comment_status_map[$post_open_tb],
 							'comment_count'		=> $post_nb_comment + $post_nb_trackback)
 							);
+					if ( is_wp_error( $ret_id ) )
+						return $ret_id;
 				}
 				$dcposts2wpposts[$post_id] = $ret_id;
 
 				// Make Post-to-Category associations
 				$cats = array();
-				if($cat1 = get_catbynicename($post_cat_name)) { $cats[1] = $cat1; }
+				$category1 = get_category_by_slug($post_cat_name);
+				$category1 = $category1->term_id;
+
+				if($cat1 = $category1) { $cats[1] = $cat1; }
 
 				if(!empty($cats)) { wp_set_post_categories($ret_id, $cats); }
 			}
@@ -509,12 +495,11 @@ class Dotclear_Import {
 				extract($link);
 
 				if ($title != "") {
-					if ($cinfo = link_cat_exists (csc ($title))) {
-						$category = $cinfo;
+					if ($cinfo = is_term(csc ($title), 'link_category')) {
+						$category = $cinfo['term_id'];
 					} else {
-						$wpdb->query ("INSERT INTO $wpdb->linkcategories (cat_name) VALUES ('".
-							$wpdb->escape (csc ($title))."')");
-						$category = $wpdb->insert_id;
+						$category = wp_insert_term($wpdb->escape (csc ($title)), 'link_category');
+						$category = $category['term_id'];
 					}
 				} else {
 					$linkname = $wpdb->escape(csc ($label));
@@ -541,7 +526,7 @@ class Dotclear_Import {
 			}
 			add_option('dclinks2wplinks',$dclinks2wplinks);
 			echo '<p>';
-			printf(__('Done! <strong>%s</strong> links or link categories imported'), $count);
+			printf(__ngettext('Done! <strong>%s</strong> link or link category imported.', 'Done! <strong>%s</strong> links or link categories imported.', $count), $count);
 			echo '<br /><br /></p>';
 			return true;
 		}
@@ -581,7 +566,9 @@ class Dotclear_Import {
 	{
 		// Post Import
 		$posts = $this->get_dc_posts();
-		$this->posts2wp($posts);
+		$result = $this->posts2wp($posts);
+		if ( is_wp_error( $result ) )
+			return $result;
 
 		echo '<form action="admin.php?import=dotclear&amp;step=4" method="post">';
 		wp_nonce_field('import-dotclear');
@@ -628,6 +615,7 @@ class Dotclear_Import {
 		delete_option('dcname');
 		delete_option('dchost');
 		delete_option('dccharset');
+		do_action('import_done', 'dotclear');
 		$this->tips();
 	}
 
@@ -652,7 +640,7 @@ class Dotclear_Import {
 
 	function db_form()
 	{
-		echo '<table class="editform">';
+		echo '<table class="form-table">';
 		printf('<tr><th><label for="dbuser">%s</label></th><td><input type="text" name="dbuser" id="dbuser" /></td></tr>', __('DotClear Database User:'));
 		printf('<tr><th><label for="dbpass">%s</label></th><td><input type="password" name="dbpass" id="dbpass" /></td></tr>', __('DotClear Database Password:'));
 		printf('<tr><th><label for="dbname">%s</label></th><td><input type="text" name="dbname" id="dbname" /></td></tr>', __('DotClear Database Name:'));
@@ -729,7 +717,9 @@ class Dotclear_Import {
 				$this->import_users();
 				break;
 			case 3 :
-				$this->import_posts();
+				$result = $this->import_posts();
+				if ( is_wp_error( $result ) )
+					echo $result->get_error_message();
 				break;
 			case 4 :
 				$this->import_comments();
@@ -752,5 +742,5 @@ class Dotclear_Import {
 }
 
 $dc_import = new Dotclear_Import();
-register_importer('dotclear', __('DotClear'), __('Import categories, users, posts, comments, and links from a DotClear blog'), array ($dc_import, 'dispatch'));
+register_importer('dotclear', __('DotClear'), __('Import categories, users, posts, comments, and links from a DotClear blog.'), array ($dc_import, 'dispatch'));
 ?>

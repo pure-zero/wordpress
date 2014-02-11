@@ -86,11 +86,14 @@ class BW_Import {
 
 			echo '<li>';
 			if ($post_id = post_exists($post_title, $post_content, $post_date)) {
-				printf(__('Post <i>%s</i> already exists.'), stripslashes($post_title));
+				printf(__('Post <em>%s</em> already exists.'), stripslashes($post_title));
 			} else {
-				printf(__('Importing post <i>%s</i>...'), stripslashes($post_title));
+				printf(__('Importing post <em>%s</em>...'), stripslashes($post_title));
 				$postdata = compact('post_author', 'post_date', 'post_content', 'post_title', 'post_status');
 				$post_id = wp_insert_post($postdata);
+				if ( is_wp_error( $post_id ) ) {
+					return $post_id;
+				}
 				if (!$post_id) {
 					_e("Couldn't get post ID");
 					echo '</li>';
@@ -138,7 +141,7 @@ class BW_Import {
 			}
 			if ( $num_comments ) {
 				echo ' ';
-				printf(__('(%s comments)'), $num_comments);
+				printf( __ngettext('%s comment', '%s comments', $num_comments), $num_comments );
 			}
 			echo '</li>';
 			flush();
@@ -155,9 +158,11 @@ class BW_Import {
 		}
 
 		$this->file = $file['file'];
-		$this->import_posts();
+		$result = $this->import_posts();
+		if ( is_wp_error( $result ) )
+			return $result;
 		wp_import_cleanup($file['id']);
-
+		do_action('import_done', 'blogware');
 		echo '<h3>';
 		printf(__('All done. <a href="%s">Have fun!</a>'), get_option('home'));
 		echo '</h3>';
@@ -176,7 +181,9 @@ class BW_Import {
 				$this->greet();
 				break;
 			case 1 :
-				$this->import();
+				$result = $this->import();
+				if ( is_wp_error( $result ) )
+					$result->get_error_message();
 				break;
 		}
 
@@ -190,5 +197,5 @@ class BW_Import {
 
 $blogware_import = new BW_Import();
 
-register_importer('blogware', __('Blogware'), __('Import posts from Blogware'), array ($blogware_import, 'dispatch'));
+register_importer('blogware', __('Blogware'), __('Import posts from Blogware.'), array ($blogware_import, 'dispatch'));
 ?>

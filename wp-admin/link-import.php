@@ -3,9 +3,8 @@
 // Copyright (C) 2002 Mike Little -- mike@zed1.com
 
 require_once('admin.php');
-$parent_file = 'link-manager.php';
+$parent_file = 'edit.php';
 $title = __('Import Blogroll');
-$this_file = 'link-import.php';
 
 $step = $_POST['step'];
 if (!$step) $step = 0;
@@ -30,12 +29,12 @@ switch ($step) {
 <div style="width: 70%; margin: auto; height: 8em;">
 <input type="hidden" name="step" value="1" />
 <input type="hidden" name="MAX_FILE_SIZE" value="30000" />
-<div style="width: 48%; float: left;">
+<div style="width: 48%;" class="alignleft">
 <h3><?php _e('Specify an OPML URL:'); ?></h3>
 <input type="text" name="opml_url" size="50" style="width: 90%;" value="http://" />
 </div>
 
-<div style="width: 48%; float: left;">
+<div style="width: 48%;" class="alignleft">
 <h3><?php _e('Or choose from your local disk:'); ?></h3>
 <input id="userfile" name="userfile" type="file" size="30" />
 </div>
@@ -45,16 +44,16 @@ switch ($step) {
 <p style="clear: both; margin-top: 1em;"><?php _e('Now select a category you want to put these links in.') ?><br />
 <?php _e('Category:') ?> <select name="cat_id">
 <?php
-$categories = get_categories('hide_empty=0');
+$categories = get_terms('link_category', 'get=all');
 foreach ($categories as $category) {
 ?>
-<option value="<?php echo $category->cat_ID; ?>"><?php echo wp_specialchars(apply_filters('link_category', $category->cat_name)); ?></option>
+<option value="<?php echo $category->term_id; ?>"><?php echo wp_specialchars(apply_filters('link_category', $category->name)); ?></option>
 <?php
 } // end foreach
 ?>
 </select></p>
 
-<p class="submit"><input type="submit" name="submit" value="<?php _e('Import OPML File &raquo;') ?>" /></p>
+<p class="submit"><input type="submit" name="submit" value="<?php _e('Import OPML File') ?>" /></p>
 </form>
 
 </div>
@@ -98,7 +97,7 @@ foreach ($categories as $category) {
 			} else {
 				$opml = file_get_contents($opml_url);
 			}
-			
+
 			include_once('link-parse-opml.php');
 
 			$link_count = count($names);
@@ -123,7 +122,7 @@ else
 } // end else
 
 if ( ! $blogrolling )
-	apply_filters( 'wp_delete_file', $opml_url); 
+	do_action( 'wp_delete_file', $opml_url);
 	@unlink($opml_url);
 ?>
 </div>

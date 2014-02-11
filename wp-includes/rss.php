@@ -1,11 +1,22 @@
 <?php
-/*
- * Project:     MagpieRSS: a simple RSS integration tool
- * File:        A compiled file for RSS syndication
- * Author:      Kellan Elliott-McCrea <kellan@protest.net>
- * Version:		0.51
- * License:		GPL
+/**
+ * MagpieRSS: a simple RSS integration tool
+ *
+ * A compiled file for RSS syndication
+ *
+ * @author Kellan Elliott-McCrea <kellan@protest.net>
+ * @version 0.51
+ * @license GPL
+ *
+ * @package External
+ * @subpackage MagpieRSS
  */
+
+/*
+ * Hook to use another RSS object instead of MagpieRSS
+ */
+do_action('load_feed_engine');
+
 
 define('RSS', 'RSS');
 define('ATOM', 'Atom');
@@ -375,6 +386,7 @@ class MagpieRSS {
 }
 require_once( dirname(__FILE__) . '/class-snoopy.php');
 
+if ( !function_exists('fetch_rss') ) :
 function fetch_rss ($url) {
 	// initialize constants
 	init();
@@ -501,6 +513,7 @@ function fetch_rss ($url) {
 
 	} // end if ( !MAGPIE_CACHE_ON ) {
 } // end fetch_rss()
+endif;
 
 function _fetch_remote_file ($url, $headers = "" ) {
 	// Snoopy is an HTTP client in PHP
@@ -663,9 +676,10 @@ class RSSCache {
 		$cache_option = 'rss_' . $this->file_name( $url );
 		$cache_timestamp = 'rss_' . $this->file_name( $url ) . '_ts';
 
-		if ( !$wpdb->get_var("SELECT option_name FROM $wpdb->options WHERE option_name = '$cache_option'") )
+		// shouldn't these be using get_option() ?
+		if ( !$wpdb->get_var( $wpdb->prepare( "SELECT option_name FROM $wpdb->options WHERE option_name = %s", $cache_option ) ) )
 			add_option($cache_option, '', '', 'no');
-		if ( !$wpdb->get_var("SELECT option_name FROM $wpdb->options WHERE option_name = '$cache_timestamp'") )
+		if ( !$wpdb->get_var( $wpdb->prepare( "SELECT option_name FROM $wpdb->options WHERE option_name = %s", $cache_timestamp ) ) )
 			add_option($cache_timestamp, '', '', 'no');
 
 		update_option($cache_option, $rss);
@@ -775,6 +789,7 @@ class RSSCache {
 	}
 }
 
+if ( !function_exists('parse_w3cdtf') ) :
 function parse_w3cdtf ( $date_str ) {
 
 	# regex to match wc3dtf
@@ -815,27 +830,35 @@ function parse_w3cdtf ( $date_str ) {
 	else {
 		return -1;
 	}
-	}
-function wp_rss ($url, $num_items) {
-	//ini_set("display_errors", false); uncomment to suppress php errors thrown if the feed is not returned.
-	$rss = fetch_rss($url);
-		if ( $rss ) {
-			echo "<ul>";
-			$rss->items = array_slice($rss->items, 0, $num_items);
-				foreach ($rss->items as $item ) {
-					echo "<li>\n";
-					echo "<a href='$item[link]' title='$item[description]'>";
-					echo htmlentities($item['title']);
-					echo "</a><br />\n";
-					echo "</li>\n";
-				}
-			echo "</ul>";
-	}
-		else {
-			echo "an error has occured the feed is probably down, try again later.";
+}
+endif;
+
+if ( !function_exists('wp_rss') ) :
+function wp_rss( $url, $num_items = -1 ) {
+	if ( $rss = fetch_rss( $url ) ) {
+		echo '<ul>';
+
+		if ( $num_items !== -1 ) {
+			$rss->items = array_slice( $rss->items, 0, $num_items );
+		}
+
+		foreach ( $rss->items as $item ) {
+			printf(
+				'<li><a href="%1$s" title="%2$s">%3$s</a></li>',
+				clean_url( $item['link'] ),
+				attribute_escape( strip_tags( $item['description'] ) ),
+				htmlentities( $item['title'] )
+			);
+		}
+
+		echo '</ul>';
+	} else {
+		_e( 'An error has occurred, which probably means the feed is down. Try again later.' );
 	}
 }
+endif;
 
+if ( !function_exists('get_rss') ) :
 function get_rss ($url, $num_items = 5) { // Like get posts, but for RSS
 	$rss = fetch_rss($url);
 	if ( $rss ) {
@@ -851,4 +874,6 @@ function get_rss ($url, $num_items = 5) { // Like get posts, but for RSS
 		return false;
 	}
 }
+endif;
+
 ?>

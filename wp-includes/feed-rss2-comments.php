@@ -1,12 +1,18 @@
 <?php
-header('Content-type: text/xml;charset=' . get_option('blog_charset'), true);
+/**
+ * RSS2 Feed Template for displaying RSS2 Comments feed.
+ *
+ * @package WordPress
+ */
 
-echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>'; 
+header('Content-Type: text/xml;charset=' . get_option('blog_charset'), true);
+
+echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>';
 ?>
-<!-- generator="wordpress/<?php echo $wp_version ?>" -->
-<rss version="2.0" 
+<rss version="2.0"
 	xmlns:content="http://purl.org/rss/1.0/modules/content/"
 	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
 	>
 <channel>
 	<title><?php
@@ -17,12 +23,13 @@ echo '<?xml version="1.0" encoding="'.get_option('blog_charset').'"?'.'>';
 		else
 			printf(__('Comments for %s'), get_bloginfo_rss( 'name' ) . get_wp_title_rss());
 	?></title>
-	<link><?php (is_single()) ? permalink_single_rss() : bloginfo_rss("url") ?></link>
+	<atom:link href="<?php self_link(); ?>" rel="self" type="application/rss+xml" />
+	<link><?php (is_single()) ? the_permalink_rss() : bloginfo_rss("url") ?></link>
 	<description><?php bloginfo_rss("description") ?></description>
 	<pubDate><?php echo gmdate('r'); ?></pubDate>
-	<generator>http://wordpress.org/?v=<?php echo $wp_version ?></generator>
-
-<?php 
+	<?php the_generator( 'rss2' ); ?>
+	<?php do_action('commentsrss2_head'); ?>
+<?php
 if ( have_comments() ) : while ( have_comments() ) : the_comment();
 	$comment_post = get_post($comment->comment_post_ID);
 	get_post_custom($comment_post->ID);
@@ -31,7 +38,6 @@ if ( have_comments() ) : while ( have_comments() ) : the_comment();
 		<title><?php
 			if ( !is_singular() ) {
 				$title = get_the_title($comment_post->ID);
-				$title = apply_filters('the_title', $title);
 				$title = apply_filters('the_title_rss', $title);
 				printf(__('Comment on %1$s by %2$s'), $title, get_comment_author_rss());
 			} else {
@@ -41,7 +47,7 @@ if ( have_comments() ) : while ( have_comments() ) : the_comment();
 		<link><?php comment_link() ?></link>
 		<dc:creator><?php echo get_comment_author_rss() ?></dc:creator>
 		<pubDate><?php echo mysql2date('D, d M Y H:i:s +0000', get_comment_time('Y-m-d H:i:s', true), false); ?></pubDate>
-		<guid><?php comment_link() ?></guid>
+		<guid isPermaLink="false"><?php comment_guid() ?></guid>
 <?php if (!empty($comment_post->post_password) && $_COOKIE['wp-postpass'] != $comment_post->post_password) : ?>
 		<description><?php _e('Protected Comments: Please enter your password to view comments.'); ?></description>
 		<content:encoded><![CDATA[<?php echo get_the_password_form() ?>]]></content:encoded>

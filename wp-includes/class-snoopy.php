@@ -1,5 +1,13 @@
 <?php
-
+/**
+ * Snoopy - the PHP net client
+ * @author Monte Ohrt <monte@ispi.net>
+ * @copyright 1999-2000 ispi, all rights reserved
+ * @version 1.01
+ * @license GNU Lesser GPL
+ * @link http://snoopy.sourceforge.net/
+ * @package Snoopy
+ */
 /*************************************************
 
 Snoopy - the PHP net client
@@ -796,7 +804,7 @@ class Snoopy
 			$headers .= "User-Agent: ".$this->agent."\r\n";
 		if(!empty($this->host) && !isset($this->rawheaders['Host'])) {
 			$headers .= "Host: ".$this->host;
-			if(!empty($this->port))
+			if(!empty($this->port) && $this->port != 80)
 				$headers .= ":".$this->port;
 			$headers .= "\r\n";
 		}
@@ -816,7 +824,7 @@ class Snoopy
 				$cookie_headers .= $cookieKey."=".urlencode($cookieVal)."; ";
 				}
 				$headers .= substr($cookie_headers,0,-2) . "\r\n";
-			} 
+			}
 		}
 		if(!empty($this->rawheaders))
 		{
