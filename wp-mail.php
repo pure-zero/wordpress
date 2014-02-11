@@ -5,19 +5,17 @@ require_once(ABSPATH.WPINC.'/class-pop3.php');
 
 error_reporting(2037);
 
-$time_difference = get_settings('gmt_offset') * 3600;
+$time_difference = get_option('gmt_offset') * 3600;
 
 $phone_delim = '::';
 
 $pop3 = new POP3();
 
-if (!$pop3->connect(get_settings('mailserver_url'), get_settings('mailserver_port'))) :
-	echo "Ooops $pop3->ERROR <br />\n";
-	exit;
-endif;
+if (!$pop3->connect(get_option('mailserver_url'), get_option('mailserver_port')))
+	wp_die($pop3->ERROR);
 
-$count = $pop3->login(get_settings('mailserver_login'), get_settings('mailserver_pass'));
-if (0 == $count) die(__('There doesn&#8217;t seem to be any new mail.'));
+$count = $pop3->login(get_option('mailserver_login'), get_option('mailserver_pass'));
+if (0 == $count) wp_die(__('There doesn&#8217;t seem to be any new mail.'));
 
 
 for ($i=1; $i <= $count; $i++) :
@@ -26,10 +24,10 @@ for ($i=1; $i <= $count; $i++) :
 
 	$content = '';
 	$content_type = '';
+	$content_transfer_encoding = '';
 	$boundary = '';
 	$bodysignal = 0;
-	$dmonths = array('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-					 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
+	$dmonths = array('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
 	foreach ($message as $line) :
 		if (strlen($line) < 3) $bodysignal = 1;
 
@@ -41,6 +39,12 @@ for ($i=1; $i <= $count; $i++) :
 				$content_type = substr($content_type, 14, strlen($content_type)-14);
 				$content_type = explode(';', $content_type);
 				$content_type = $content_type[0];
+			}
+			if (preg_match('/Content-Transfer-Encoding: /i', $line)) {
+				$content_transfer_encoding = trim($line);
+				$content_transfer_encoding = substr($content_transfer_encoding, 27, strlen($content_transfer_encoding)-14);
+				$content_transfer_encoding = explode(';', $content_transfer_encoding);
+				$content_transfer_encoding = $content_transfer_encoding[0];
 			}
 			if (($content_type == 'multipart/alternative') && (preg_match('/boundary="/', $line)) && ($boundary == '')) {
 				$boundary = trim($line);
@@ -58,19 +62,19 @@ for ($i=1; $i <= $count; $i++) :
 
 			// Set the author using the email address (To or Reply-To, the last used)
 			// otherwise use the site admin
-			if (preg_match('/From: /', $line) | preg_match('Reply-To: /', $line))  {
+			if (preg_match('/From: /', $line) | preg_match('/Reply-To: /', $line))  {
 				$author=trim($line);
-			if ( ereg("([a-zA-Z0-9\_\-\.]+@[\a-zA-z0-9\_\-\.]+)", $author , $regs) ) {
-				$author = $regs[1];
-				echo "Author = {$author} <p>";
-				$author = $wpdb->escape($author);
-				$result = $wpdb->get_row("SELECT ID FROM $wpdb->users WHERE user_email='$author' LIMIT 1");
-				if (!$result)
+				if ( ereg("([a-zA-Z0-9\_\-\.]+@[\a-zA-z0-9\_\-\.]+)", $author , $regs) ) {
+					$author = $regs[1];
+					echo "Author = {$author} <p>";
+					$author = $wpdb->escape($author);
+					$result = $wpdb->get_row("SELECT ID FROM $wpdb->users WHERE user_email='$author' LIMIT 1");
+					if (!$result)
+						$post_author = 1;
+					else
+						$post_author = $result->ID;
+				} else
 					$post_author = 1;
-				else
-					$post_author = $result->ID;
-			} else
-				$post_author = 1;
 			}
 
 			if (preg_match('/Date: /i', $line)) { // of the form '20 Mar 2002 20:32:37'
@@ -104,7 +108,7 @@ for ($i=1; $i <= $count; $i++) :
 		}
 	endforeach;
 
-	$subject = trim(str_replace(get_settings('subjectprefix'), '', $subject));
+	$subject = trim(str_replace(get_option('subjectprefix'), '', $subject));
 
 	if ($content_type == 'multipart/alternative') {
 		$content = explode('--'.$boundary, $content);
@@ -113,11 +117,16 @@ for ($i=1; $i <= $count; $i++) :
 		$content = strip_tags($content[1], '<img><p><br><i><b><u><em><strong><strike><font><span><div>');
 	}
 	$content = trim($content);
+	
+	if (stripos($content_transfer_encoding, "quoted-printable") !== false) {
+		$content = quoted_printable_decode($content);
+	}
+
 	// Captures any text in the body after $phone_delim as the body
 	$content = explode($phone_delim, $content);
 	$content[1] ? $content = $content[1] : $content = $content[0];
 
-	echo "<p><b>Content-type:</b> $content_type, <b>boundary:</b> $boundary</p>\n";
+	echo "<p><b>Content-type:</b> $content_type, <b>Content-Transfer-Encoding:</b> $content_transfer_encoding, <b>boundary:</b> $boundary</p>\n";
 	echo "<p><b>Raw content:</b><br /><pre>".$content.'</pre></p>';
 
 	$content = trim($content);
@@ -128,7 +137,7 @@ for ($i=1; $i <= $count; $i++) :
 
 	if ($post_title == '') $post_title = $subject;
 
-	if (empty($post_categories)) $post_categories[] = get_settings('default_email_category');
+	if (empty($post_categories)) $post_categories[] = get_option('default_email_category');
 
 	$post_category = $post_categories;
 
@@ -150,23 +159,6 @@ for ($i=1; $i <= $count; $i++) :
 	echo "\n<p><b>Author:</b> $post_author</p>";
 	echo "\n<p><b>Posted title:</b> $post_title<br />";
 	echo "\n<b>Posted content:</b><br /><pre>".$content.'</pre></p>';
-
-	if (!$post_categories) $post_categories[] = 1;
-	foreach ($post_categories as $post_category) :
-		$post_category = intval($post_category);
-
-		// Double check it's not there already
-		$exists = $wpdb->get_row("SELECT * FROM $wpdb->post2cat WHERE post_id = $post_ID AND category_id = $post_category");
-
-		if (!$exists && $result) { 
-			$wpdb->query("
-			INSERT INTO $wpdb->post2cat
-			(post_id, category_id)
-			VALUES
-			($post_ID, $post_category)
-			");
-		}
-	endforeach;
 
 	if(!$pop3->delete($i)) {
 		echo '<p>Oops '.$pop3->ERROR.'</p></div>';
