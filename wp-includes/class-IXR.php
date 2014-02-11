@@ -13,9 +13,16 @@
  * @license BSD License http://www.opensource.org/licenses/bsd-license.php
  */
 
+/**
+ * IXR_Value
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_Value {
     var $data;
     var $type;
+
     function IXR_Value ($data, $type = false) {
         $this->data = $data;
         if (!$type) {
@@ -34,6 +41,7 @@ class IXR_Value {
             }
         }
     }
+
     function calculateType() {
         if ($this->data === true || $this->data === false) {
             return 'boolean';
@@ -67,6 +75,7 @@ class IXR_Value {
             return 'array';
         }
     }
+
     function getXml() {
         /* Return XML for this value */
         switch ($this->type) {
@@ -107,6 +116,7 @@ class IXR_Value {
         }
         return false;
     }
+
     function isStruct($array) {
         /* Nasty function to check if an array is a struct or not */
         $expected = 0;
@@ -120,7 +130,12 @@ class IXR_Value {
     }
 }
 
-
+/**
+ * IXR_Message
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_Message {
     var $message;
     var $messageType;  // methodCall / methodResponse / fault
@@ -143,7 +158,7 @@ class IXR_Message {
     }
     function parse() {
         // first remove the XML declaration
-        $this->message = preg_replace('/<\?xml(.*)?\?'.'>/', '', $this->message);
+        $this->message = preg_replace('/<\?xml.*?\?'.'>/', '', $this->message);
         if (trim($this->message) == '') {
             return false;
         }
@@ -169,7 +184,7 @@ class IXR_Message {
         return true;
     }
     function tag_open($parser, $tag, $attr) {
-		$this->_currentTagContents = '';
+        $this->_currentTagContents = '';
         $this->currentTag = $tag;
         switch($tag) {
             case 'methodCall':
@@ -259,11 +274,16 @@ class IXR_Message {
                 $this->params[] = $value;
             }
         }
-		$this->_currentTagContents = '';
+        $this->_currentTagContents = '';
     }
 }
 
-
+/**
+ * IXR_Server
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_Server {
     var $data;
     var $callbacks = array();
@@ -281,6 +301,7 @@ class IXR_Server {
         if (!$data) {
             global $HTTP_RAW_POST_DATA;
             if (!$HTTP_RAW_POST_DATA) {
+               header( 'Content-Type: text/plain' );
                die('XML-RPC server accepts POST requests only.');
             }
             $data = $HTTP_RAW_POST_DATA;
@@ -318,7 +339,8 @@ EOD;
     }
     function call($methodname, $args) {
         if (!$this->hasMethod($methodname)) {
-            return new IXR_Error(-32601, 'server error. requested method '.$methodname.' does not exist.');
+            return new IXR_Error(-32601, 'server error. requested method '.
+                $methodname.' does not exist.');
         }
         $method = $this->callbacks[$methodname];
         // Perform the callback and send the response
@@ -331,18 +353,21 @@ EOD;
             // It's a class method - check it exists
             $method = substr($method, 5);
             if (!method_exists($this, $method)) {
-                return new IXR_Error(-32601, 'server error. requested class method "'.$method.'" does not exist.');
+                return new IXR_Error(-32601, 'server error. requested class method "'.
+                    $method.'" does not exist.');
             }
             // Call the method
             $result = $this->$method($args);
         } else {
             // It's a function - does it exist?
             if (is_array($method)) {
-            	if (!method_exists($method[0], $method[1])) {
-                return new IXR_Error(-32601, 'server error. requested object method "'.$method[1].'" does not exist.');
-            	}
+                if (!method_exists($method[0], $method[1])) {
+                    return new IXR_Error(-32601, 'server error. requested object method "'.
+                        $method[1].'" does not exist.');
+                }
             } else if (!function_exists($method)) {
-                return new IXR_Error(-32601, 'server error. requested function "'.$method.'" does not exist.');
+                return new IXR_Error(-32601, 'server error. requested function "'.
+                    $method.'" does not exist.');
             }
             // Call the function
             $result = call_user_func($method, $args);
@@ -424,6 +449,12 @@ EOD;
     }
 }
 
+/**
+ * IXR_Request
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_Request {
     var $method;
     var $args;
@@ -454,16 +485,22 @@ EOD;
     }
 }
 
-
+/**
+ * IXR_Client
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_Client {
     var $server;
     var $port;
     var $path;
     var $useragent;
+	var $headers;
     var $response;
     var $message = false;
     var $debug = false;
-	var $timeout;
+    var $timeout;
     // Storage place for an error message
     var $error = false;
     function IXR_Client($server, $path = false, $port = 80, $timeout = false) {
@@ -482,8 +519,8 @@ class IXR_Client {
             $this->path = $path;
             $this->port = $port;
         }
-        $this->useragent = 'Incutio XML-RPC';
-		$this->timeout = $timeout;
+        $this->useragent = 'The Incutio XML-RPC PHP Library';
+        $this->timeout = $timeout;
     }
     function query() {
         $args = func_get_args();
@@ -493,14 +530,21 @@ class IXR_Client {
         $xml = $request->getXml();
         $r = "\r\n";
         $request  = "POST {$this->path} HTTP/1.0$r";
-        $request .= "Host: {$this->server}$r";
-        $request .= "Content-Type: text/xml$r";
-        $request .= "User-Agent: {$this->useragent}$r";
-        $request .= "Content-length: {$length}$r$r";
+
+		$this->headers['Host']			= $this->server;
+		$this->headers['Content-Type']	= 'text/xml';
+		$this->headers['User-Agent']	= $this->useragent;
+		$this->headers['Content-Length']= $length;
+
+		foreach( $this->headers as $header => $value ) {
+			$request .= "{$header}: {$value}{$r}";
+		}
+		$request .= $r;
+
         $request .= $xml;
         // Now send the request
         if ($this->debug) {
-            echo '<pre>'.htmlspecialchars($request)."\n</pre>\n\n";
+            echo '<pre class="ixr_request">'.htmlspecialchars($request)."\n</pre>\n\n";
         }
         if ($this->timeout) {
             $fp = @fsockopen($this->server, $this->port, $errno, $errstr, $this->timeout);
@@ -513,6 +557,7 @@ class IXR_Client {
         }
         fputs($fp, $request);
         $contents = '';
+        $debug_contents = '';
         $gotFirstLine = false;
         $gettingHeaders = true;
         while (!feof($fp)) {
@@ -520,7 +565,7 @@ class IXR_Client {
             if (!$gotFirstLine) {
                 // Check line for '200'
                 if (strstr($line, '200') === false) {
-                    $this->error = new IXR_Error(-32300, 'transport error - HTTP status code was not 200');
+                    $this->error = new IXR_Error(-32301, 'transport error - HTTP status code was not 200');
                     return false;
                 }
                 $gotFirstLine = true;
@@ -529,11 +574,14 @@ class IXR_Client {
                 $gettingHeaders = false;
             }
             if (!$gettingHeaders) {
-                $contents .= trim($line)."\n";
+                $contents .= trim($line);
+            }
+            if ($this->debug) {
+                $debug_contents .= $line;
             }
         }
         if ($this->debug) {
-            echo '<pre>'.htmlspecialchars($contents)."\n</pre>\n\n";
+            echo '<pre class="ixr_response">'.htmlspecialchars($debug_contents)."\n</pre>\n\n";
         }
         // Now parse what we've got back
         $this->message = new IXR_Message($contents);
@@ -565,12 +613,18 @@ class IXR_Client {
     }
 }
 
-
+/**
+ * IXR_Error
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_Error {
     var $code;
     var $message;
     function IXR_Error($code, $message) {
         $this->code = $code;
+        // WP adds htmlspecialchars(). See #5666
         $this->message = htmlspecialchars($message);
     }
     function getXml() {
@@ -597,7 +651,12 @@ EOD;
     }
 }
 
-
+/**
+ * IXR_Date
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_Date {
     var $year;
     var $month;
@@ -605,6 +664,7 @@ class IXR_Date {
     var $hour;
     var $minute;
     var $second;
+    var $timezone;
     function IXR_Date($time) {
         // $time can be a PHP timestamp or an ISO one
         if (is_numeric($time)) {
@@ -620,6 +680,8 @@ class IXR_Date {
         $this->hour = date('H', $timestamp);
         $this->minute = date('i', $timestamp);
         $this->second = date('s', $timestamp);
+        // WP adds timezone. See #2036
+        $this->timezone = '';
     }
     function parseIso($iso) {
         $this->year = substr($iso, 0, 4);
@@ -628,9 +690,11 @@ class IXR_Date {
         $this->hour = substr($iso, 9, 2);
         $this->minute = substr($iso, 12, 2);
         $this->second = substr($iso, 15, 2);
+        // WP adds timezone. See #2036
         $this->timezone = substr($iso, 17);
     }
     function getIso() {
+    	// WP adds timezone. See #2036
         return $this->year.$this->month.$this->day.'T'.$this->hour.':'.$this->minute.':'.$this->second.$this->timezone;
     }
     function getXml() {
@@ -641,7 +705,12 @@ class IXR_Date {
     }
 }
 
-
+/**
+ * IXR_Base64
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_Base64 {
     var $data;
     function IXR_Base64($data) {
@@ -652,7 +721,12 @@ class IXR_Base64 {
     }
 }
 
-
+/**
+ * IXR_IntrospectionServer
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_IntrospectionServer extends IXR_Server {
     var $signatures;
     var $help;
@@ -796,7 +870,12 @@ class IXR_IntrospectionServer extends IXR_Server {
     }
 }
 
-
+/**
+ * IXR_ClientMulticall
+ *
+ * @package IXR
+ * @since 1.5
+ */
 class IXR_ClientMulticall extends IXR_Client {
     var $calls = array();
     function IXR_ClientMulticall($server, $path = false, $port = 80) {
